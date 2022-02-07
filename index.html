@@ -1,0 +1,147 @@
+<html>
+	<head>
+		<title>Solver</title>
+		<link rel="stylesheet" href="style.css">
+	</head>
+
+	<body>
+		<div id="game">
+			<table id="grid">
+
+			</table>
+
+			<div id="controls">
+				<button onClick="gridImport()">Import</button>
+				<button onClick="gridExport()">Export</button>
+				<br /><br />
+				<button onClick="gridInit()">Init</button>
+				<button onClick="gridStep()">Step</button>
+				<button onClick="gridCommit()">Commit</button>
+			</div>
+		</div>
+
+		<script>
+			(function createGrid() {
+				// Create the sudoku grid - including candidates
+				// This is self-invoking
+
+				const grid = document.getElementById('grid');
+
+				for (let i = 1; i <= 9; i++) {
+					// Create 9 rows
+					let row = document.createElement('tr');
+					row.id = `row${i}`;
+					row.className = 'row';
+					grid.appendChild(row);
+
+					for (let j = 1; j <= 9; j++) {
+						// For each row, create 9 cells
+						let cell = document.createElement('td');
+						cell.className = 'cell';
+						row.appendChild(cell);
+
+						// Each cell needs a candidate table
+						let candidates = document.createElement('table');
+						candidates.className = 'candidates';
+						cell.appendChild(candidates);
+
+						// Each cell needs an input box
+						let input = document.createElement('input');
+						input.type = 'text';
+						input.maxLength = 1;
+						input.id = `c${i}${j}`;
+						cell.appendChild(input);
+
+						// Populate the candidate table (3x3)
+						// First create 3 rows and store them in a 1-indexed array
+						let cRow1 = document.createElement('tr');
+						let cRow2 = document.createElement('tr');
+						let cRow3 = document.createElement('tr');
+						let cRows = [null, cRow1, cRow2, cRow3];
+						candidates.appendChild(cRow1);
+						candidates.appendChild(cRow2);
+						candidates.appendChild(cRow3);
+
+						// Then for each candidate
+						for (let k = 1; k <= 9; k++) {
+							// Create the candidate
+							let canRow = document.createElement('td');
+							let canDiv = document.createElement('div');
+							canDiv.className = 'can';
+							canDiv.id = `p${i}${j}${k}`;
+							canDiv.innerHTML = k;
+
+							// Append it to a row where
+							// 1 to 3 = row 1
+							// 4 to 6 = row 2
+							// 7 to 9 = row 3
+							canRow.appendChild(canDiv);
+							cRows[Math.ceil(k / 3)].appendChild(canRow);
+						};
+					};
+				};
+			})();
+
+
+			// =================
+			// Button Functions
+			// =================
+
+			function gridImport() {
+				// Resolve import strings
+				// Characters supported as blanks: 0
+				// TODO: Consider all non 1-9 characters as blanks
+				// TODO: Reset grid before importing - currently assumes grid is empty
+
+				let input = prompt('Input 81 digit string');
+				if (!input || input.length != 81) {
+					alert('Invalid input string');
+					return;
+				};
+
+				let digits = input.split('');				
+				for (let i = 9; i >= 1; i--) {
+					for (let j = 9; j >= 1; j--) {
+						let n = parseInt(digits.pop());
+						if (n) document.getElementById(`c${i}${j}`).value = n;
+					};
+				};
+			};
+
+			function gridExport() {
+				// Export current grid string to console
+				// Blanks are exported as 0
+				// TODO: Copy to clipboard
+
+				let output = [];
+				for (let i = 1; i <= 9; i++) {
+					for (let j = 1; j <= 9; j++) {
+						output.push(document.getElementById(`c${i}${j}`).value || 0);
+					};
+				};
+
+				console.log(output.join(''));
+			};
+
+			function gridReset() {
+
+			};
+
+			// ========================
+			// Solver Wrapper Functions
+			// ========================
+
+			function gridInit() {
+
+			};
+
+			function gridStep() {
+
+			};
+
+			function gridCommit() {
+
+			};
+		</script>
+	</body>
+</html>
