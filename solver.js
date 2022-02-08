@@ -25,12 +25,8 @@ function _Cell(game = new _Game(), id = '', value = 0) {
 	this.row = parseInt(id[0]);
 	this.col = parseInt(id[1]);
 	this.box = boxMap[parseInt(id)];
-	// `this.value` should be read-only as candidates need to be in sync.
-	// See helper function `setValue`
-	Object.defineProperty(this, 'value', {
-		'value': value,
-		writable: false
-	});
+	// cell.value and cell.candidates need to be in sync, use the helper function to set the value
+	this.value = value;
 	// An important feature is that candidate arrays are always sorted lowest to highest
 	// Therefore cells with identical available candidates will have identical cell.candidates
 	this.candidates = value ? [value] : [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -390,6 +386,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 
 					// The only difference is, we no longer need to check for naked singles
 					// As if they existed they would be found via row
+					if (n == 1) continue;
+
 					let _t = new _Tuple(ncCells, tuple, [], 'NAKED', house, 'COL');
 					this.forEachCellOfCols(house, cell => {
 						if (ncCells.cellIds().includes(cell.id)) return;
@@ -440,6 +438,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 
 					// The only difference is, we no longer need to check for naked singles
 					// As if they existed they would be found via row
+					if (n == 1) continue;
+
 					let _t = new _Tuple(nbCells, tuple, [], 'NAKED', house, 'BOX');
 					this.forEachCellOfBoxs(house, cell => {
 						if (nbCells.cellIds().includes(cell.id)) return;
@@ -504,6 +504,25 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 
 		this.solution = this.tuples(4);
 		if (this.solution) return;
+	};
+
+	this.commit = () => {
+		if (!this.solution) {
+			console.warn('_Game.solution is null, run _Game.step()');
+			return;
+		};
+
+		this.solution.changes.forEach(change => {
+			let cell = change[0];
+			let value = change[1];
+			let candidates = change[2];
+
+			if (value) cell.setValue(value);
+			else cell.candidates = candidates;
+		});
+
+		this.solution = null;
+		this.generateCandidates();
 	};
 };
 

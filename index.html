@@ -140,12 +140,17 @@
 			};
 
 			function gridStep() {
+				clearHighlighting();
 				game.step();
-				
 				highlightChanges();
 			};
 
-			// TODO: gridCommit()
+			function gridCommit() {
+				clearHighlighting();
+				game.commit();
+				syncValues();
+				syncCandidates();
+			};
 
 			// ============
 			// UI Functions
@@ -161,6 +166,18 @@
 					};
 				});
 			};
+
+			function syncValues() {
+				game.forEachCell(cell => {
+					if (cell.value) {
+						let element = document.getElementById('c' + cell.id);
+						if (!element.value) {
+							element.value = cell.value;
+							element.style.color = 'red';
+						};
+					};
+				});
+			}
 
 			function highlightChanges() {
 				if (!game.solution) {
@@ -193,7 +210,7 @@
 				};
 			};
 
-			function clearHighlights() {
+			function clearHighlighting() {
 				for (let row = 1; row <= 9; row++) {
 					for (let col = 1; col <= 9; col++) {
 						let cell = document.getElementById('c' + row + col);
