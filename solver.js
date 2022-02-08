@@ -31,6 +31,8 @@ function _Cell(game = new _Game(), id = '', value = 0) {
 		'value': value,
 		writable: false
 	});
+	// An important feature is that candidate arrays are always sorted lowest to highest
+	// Therefore cells with identical available candidates will have identical cell.candidates
 	this.candidates = value ? [value] : [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 	// ==================
@@ -72,11 +74,27 @@ function _Cell(game = new _Game(), id = '', value = 0) {
 		if (this.value) return;
 
 		// We only remove from the existing candidate list to not undo our solving work
-		for (const candidate of this.candidates) {
+		// [...this.candidates] so we are not modifying the array we are iterating
+		for (const candidate of [...this.candidates]) {
 			if (!this.validate(candidate)) this.removeCandidate(candidate);
 		};
 
 		return this.candidates;
+	};
+
+	// =============================
+	// Solving Fundamental Functions
+	// =============================
+
+	this.sees = (cell) => {
+		if (cell) return (cell.row == this.row || cell.col == this.col || cell.box == this.box);
+
+		let cells = [];
+		this.game.forEachCell(tCell => {
+			if (this.row == tCell.row || this.col == tCell.col || this.box == tCell.box) cells.push(tCell);
+		});
+
+		return cells;
 	};
 
 	// ================
@@ -97,21 +115,6 @@ function _Cell(game = new _Game(), id = '', value = 0) {
 		this.candidates.splice(index, 1);
 
 		return this.candidates;
-	};
-
-	// =================
-	// Solving Functions
-	// =================
-
-	this.sees = (cell) => {
-		if (cell) return (cell.row == this.row || cell.col == this.col || cell.box == this.box);
-
-		let cells = [];
-		this.game.forEachCell(tCell => {
-			if (this.row == tCell.row || this.col == tCell.col || this.box == tCell.box) cells.push(tCell);
-		});
-
-		return cells;
 	};
 };
 
@@ -139,7 +142,9 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		[, new _Cell(this, '91', v[72]), new _Cell(this, '92', v[73]), new _Cell(this, '93', v[74]), new _Cell(this, '94', v[75]), new _Cell(this, '95', v[76]), new _Cell(this, '96', v[77]), new _Cell(this, '97', v[78]), new _Cell(this, '98', v[79]), new _Cell(this, '99', v[80])],
 	];
 
-	this.changes = [];
+	// Next step in the solution will be stored here
+	// Format is based on solution.name
+	this.solution = null;
 
 	// =================
 	// Iterative Functions
@@ -214,8 +219,195 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		this.forEachCell(cell => cell.generateCandidates());
 	})();
 
-	// ================
-	// Solver Functions
-	// ================
+	// =============================
+	// Solving Fundamental Functions
+	// =============================
 
+	this.containsCandidates = (candidates, row = 0, col = 0, box = 0, exact = false, every = false, exclusive = false) => {
+		// This funtion is the back-bone of the solver
+		// Finds all cells within the given house overlap that can contain `candidates`
+		// Excludes cells with a set value
+
+		let cells = [];
+		if (!Array.isArray(candidates)) candidates = [candidates];
+
+		this.forEachCell(cell => {
+			if (cell.value) return;
+			if (row && cell.row != row) return;
+			if (col && cell.col != col) return;
+			if (box && cell.box != box) return;
+
+			// Has four modes:
+
+			// EXACT: cells must contain EXACTly and only `[candidates]` ie: [1,2] = [1,2]
+			if (exact && candidates.equals(cell.candidates)) cells.push(cell);
+			if (exact) return;
+
+			// EVERY: cells must contain EVERY `[candidates]`, with extras allowed ie: [1,2] = [1,2,3]
+			if (every && candidates.every(c => cell.candidates.includes(c))) cells.push(cell);
+			if (every) return;
+
+			// EXCLUSIVE: cells must contain at least one `[candidates]`, but no extras ie: [1,2] = [2]
+			if (exclusive && cell.candidates.every(c => candidates.includes(c))) cells.push(cell);
+			if (exclusive) return;
+
+			// DEFAULT: cells must contain at least one `[candidates]` ie: [1,2] = [1,8,9]
+			if (candidates.some(c => cell.candidates.includes(c))) cells.push(cell);
+		});
+
+		return cells;
+	};
+
+	// =================
+	// Solving Functions
+	// =================
+
+	this.tuples = (n = 1) => {
+		// Iterate all houses looking for tuples of n digits in n cells.
+		// Finds first actionable tuple
+		// TODO: Finish this function.
+
+		let _tuple = {
+			name: 'tuple',
+			cells: [], 		// [_Cell, _Cell, ...] (n cells)
+			tuple: [], 		// [x, y, ...] (n candidates)
+			changes: [],	// [[_Cell(), value, candidates], [_Cell(), value, candidates], ...]
+			type: '', 		// 'naked'/'hidden'
+			house: 0,		// 0-9
+			houseType: '',	// 'row'/'col'/'box'
+			class: [, 'single', 'pair', 'triple', 'quad'][n],
+			
+		};
+		
+
+		// Get all candidate combinations of n digits
+		// n = 1: 9 combos
+		// n = 2: 36 combos
+		// n = 3: 84 combos
+		// n = 4: 126 combos
+		for (const tuple of Math.combinations(9, n)) {
+			// Iterate through every house
+			for (const house of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+
+				// ROWS
+				// Find all naked tuple possibilities in row `house`
+				// The tuple candidates must be the only possible candidates in the cells
+				let nrCells = this.containsCandidates(tuple, house, 0, 0, false, false, true);
+				if (nrCells.length == n) {
+					// NAKED TUPLE
+
+					// Keep track of cells "touched" for logging purposes
+					let touched = 0;
+
+					if (n == 1) {
+						// Naked single; change the cell's value to the sole candidate
+						_tuple.changes.push([nrCells[0], tuple[0], tuple]);
+						touched++;
+					} else {
+						// Otherwise remove all tuple candidates from every other cell in the house
+						this.forEachCellOfRows(house, cell => {
+							// Filter out the cells in our tuple
+							if (nrCells.cellIds().includes(cell.id)) return;
+
+							// Filter out the tuple from cell candidates
+							let candidates = cell.candidates.filter(c => !tuple.includes(c));
+							if (!candidates.equals(cell.candidates)) {
+								// Remove all candidates of our tuple from cell
+								_tuple.changes.push([cell, null, candidates]);
+								touched++;
+							};
+						});
+					};
+
+					// If this tuple instigated changes, return it
+					if (touched) {
+						_tuple.cells = nrCells;
+						_tuple.tuple = tuple;
+						_tuple.type = 'naked';
+						_tuple.house = house;
+						_tuple.houseType = 'row'
+
+						return _tuple;
+					};
+				};
+			};
+		};
+
+		return null;
+	};
+
+	// ==============
+	// Game Functions
+	// ==============
+
+	this.step = () => {
+		if (this.solution) {
+			console.warn('_Game.solution already populated - run _Game.commit()');
+			return;
+		};
+
+		let result;
+
+		result = this.tuples(2);
+		if (result) {
+			this.solution = result;
+			return;
+		};
+	};
 };
+
+
+
+
+(function definePrototypes() {
+	// Self-invoked to define some prototypes we will need
+
+	// Array.prototype.equals
+	if (Array.prototype.equals) console.warn('Overriding existing Array.prototype.equals method');
+	Array.prototype.equals = function(array) {
+		if (!array) return false;
+		if (this.length != array.length) return false;
+
+		for (var i = 0, l=this.length; i < l; i++) {
+			if (this[i] instanceof Array && array[i] instanceof Array) {
+				if (!this[i].equals(array[i]))
+					return false;       
+			}           
+			else if (this[i] != array[i]) { 
+				return false;   
+			}           
+		}       
+		return true;
+	}
+	Object.defineProperty(Array.prototype, "equals", {enumerable: false});
+
+	
+	// Array.prototype.cellIds
+	if (Array.prototype.cellIds) console.warn('Overriding existing Array.prototype.cellIds method');
+	Array.prototype.cellIds = function() {
+		return this.map(cell => cell.id);
+	};
+	Object.defineProperty(Array.prototype, "cellIds", {enumerable: false});
+
+
+	// Math.combinations
+	if (Math.combinations) console.warn('Overriding existing Math.combinations method');
+	Math.combinations = (n, k) => {
+		const result = [];
+		const combos = [];
+		const recurse = start => {
+			if (combos.length + (n - start + 1) < k) return;
+			recurse(start + 1);
+			combos.push(start);
+			if (combos.length === k) {     
+				result.push(combos.slice());
+			} else if(combos.length + (n - start + 2) >= k) {
+				recurse(start + 1);
+			};
+			combos.pop();     
+		};
+		recurse(1, combos);
+		return result;
+	};
+	Object.defineProperty(Math, 'combinations', {enumerable: false});
+})();

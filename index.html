@@ -139,7 +139,11 @@
 				syncCandidates();
 			};
 
-			// TODO: gridStep()
+			function gridStep() {
+				game.step();
+				
+				highlightChanges();
+			};
 
 			// TODO: gridCommit()
 
@@ -156,6 +160,53 @@
 							else element.style.color = 'transparent';
 					};
 				});
+			};
+
+			function highlightChanges() {
+				if (!game.solution) {
+					console.log('NO SOLUTION COULD BE FOUND');
+					return;
+				};
+
+				let s = game.solution;
+
+				switch (s.name) {
+					case 'tuple':
+						console.log(`${(s.type + s.class).toUpperCase()} (${s.tuple}): [${s.cells.cellIds()}] ${(s.houseType + s.house).toUpperCase()}`);
+
+
+						s.cells.forEach(cell => {
+							s.tuple.forEach(candidate => document.getElementById('p' + cell.id + candidate).style.backgroundColor = 'yellow');
+						});
+
+						s.changes.forEach(change => {
+							let cell = change[0];
+							let val = change[1];
+							let can = change[2];
+
+							if (val) document.getElementById('p' + cell.id + val).style.backgroundColor = 'lime';
+							else {
+								let candidates = cell.candidates.filter(c => !can.includes(c));
+								candidates.forEach(c => document.getElementById('p' + cell.id + c).style.backgroundColor = 'red')
+							};
+						});
+					break;
+				};
+			};
+
+			function clearHighlights() {
+				for (let row = 1; row <= 9; row++) {
+					for (let col = 1; col <= 9; col++) {
+						let cell = document.getElementById('c' + row + col);
+						cell.style.color = 'blue';
+						cell.style.backgroundColor = 'transparent';
+
+						for (let can = 1; can <= 9; can++) {
+							let candidate = document.getElementById('p' + row + col + can);
+							candidate.style.backgroundColor = 'transparent';
+						};
+					};
+				};
 			};
 
 
