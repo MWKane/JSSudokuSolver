@@ -188,26 +188,39 @@
 				let s = game.solution;
 
 				switch (s.name) {
+
+					// =====
+					// TUPLE
+					// =====
 					case 'TUPLE':
 						console.log(`${(s.type + s.class)} (${s.tuple}): [${s.cells.cellIds()}] ${(s.houseType + s.house)}`);
 
 						s.cells.forEach(cell => {
 							s.tuple.forEach(candidate => document.getElementById('p' + cell.id + candidate).style.backgroundColor = 'yellow');
 						});
-
-						s.changes.forEach(change => {
-							let cell = change[0];
-							let val = change[1];
-							let can = change[2];
-
-							if (val) document.getElementById('p' + cell.id + val).style.backgroundColor = 'lime';
-							else {
-								let candidates = cell.candidates.filter(c => !can.includes(c));
-								candidates.forEach(c => document.getElementById('p' + cell.id + c).style.backgroundColor = 'red')
-							};
-						});
 					break;
+					
+					// ========
+					// POINTING
+					// ========
+					case 'POINTING':
+						console.log(`POINTING ${s.class}: [${s.cells.cellIds()}] BOX${s.box}`);
+						s.cells.forEach(cell => document.getElementById('p' + cell.id + s.candidate).style.backgroundColor = 'yellow');
+					break;
+
 				};
+
+				s.changes.forEach(change => {
+					let cell = change[0];
+					let val = change[1];
+					let can = change[2];
+
+					if (val) document.getElementById('p' + cell.id + val).style.backgroundColor = 'lime';
+					else {
+						let candidates = cell.candidates.filter(c => !can.includes(c));
+						candidates.forEach(c => document.getElementById('p' + cell.id + c).style.backgroundColor = 'red')
+					};
+				});
 			};
 
 			function clearHighlighting() {

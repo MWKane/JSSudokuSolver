@@ -483,6 +483,82 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		return null;
 	};
 
+	this.pointing = () => {
+		// Iterate each box finding a single row/column that contains all instances of a candidate
+		// Finds first actionable pointing pair/triple
+
+
+		function _Pointing(cells, changes, candidate, box) {
+			this.name = 'POINTING';
+			this.class = [,,'PAIR', 'TRIPLE'][cells.length];
+
+			// [_Cell, _Cell, ...] (n cells)
+			this.cells = cells || [];
+
+			// [[_Cell(), value, candidates], [_Cell(), value, candidates], ...]
+			this.changes = changes || [];
+
+			// 0-9
+			this.candidate = candidate || 0;
+			
+			// 0-9
+			this.box = box || 0;
+		};
+
+
+		for (const candidate of [1, 2, 3, 4, 5, 6, 7, 8,9 ]) {
+			for (const box of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+				// Get all cells in `box` with `candidate`
+				let cells = this.containsCandidates(candidate, 0, 0, box);
+
+
+				// Check if they're in the same row
+				// NOTE: `cells` can be an empty array
+				let row = cells.length ? cells[0].row : 0;
+				if (cells.length && cells.every(cell => cell.row == row)) {
+					// ===================
+					// POINTING PAIR (ROW)
+					// ===================
+
+					let _p = new _Pointing(cells, [], candidate, box);
+
+					// Find every cell with `candidate` in `row` (except our pointing cells)
+					let conflicts = this.containsCandidates(candidate, row).filter(cell => cell.box != box);
+
+					// Check if we have any cells to change
+					if (conflicts.length) {
+						// Remove `candidate` from all conflicting cells
+						conflicts.forEach(cell => _p.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]));
+						return _p;
+					};
+				};
+
+				// Repeat for column:
+
+				let col = cells.length ? cells[0].col : 0;
+				if (cells.length && cells.every(cell => cell.col == col)) {
+					// ===================
+					// POINTING PAIR (COL)
+					// ===================
+
+					let _p = new _Pointing(cells, [], candidate, box);
+
+					// Find every cell with `candidate` in `row` (except our pointing cells)
+					let conflicts = this.containsCandidates(candidate, 0, col).filter(cell => cell.box != box);
+
+					// Check if we have any cells to change
+					if (conflicts.length) {
+						// Remove `candidate` from all conflicting cells
+						conflicts.forEach(cell => _p.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]));
+						return _p;
+					};
+				};
+			};
+		};
+
+		return null;
+	};
+
 	// ==============
 	// Game Functions
 	// ==============
@@ -503,6 +579,9 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		if (this.solution) return;
 
 		this.solution = this.tuples(4);
+		if (this.solution) return;
+
+		this.solution = this.pointing();
 		if (this.solution) return;
 	};
 
