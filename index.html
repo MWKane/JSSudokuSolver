@@ -171,9 +171,8 @@
 				let s = game.solution;
 
 				switch (s.name) {
-					case 'tuple':
-						console.log(`${(s.type + s.class).toUpperCase()} (${s.tuple}): [${s.cells.cellIds()}] ${(s.houseType + s.house).toUpperCase()}`);
-
+					case 'TUPLE':
+						console.log(`${(s.type + s.class)} (${s.tuple}): [${s.cells.cellIds()}] ${(s.houseType + s.house)}`);
 
 						s.cells.forEach(cell => {
 							s.tuple.forEach(candidate => document.getElementById('p' + cell.id + candidate).style.backgroundColor = 'yellow');

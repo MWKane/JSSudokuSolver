@@ -146,9 +146,9 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	// Format is based on solution.name
 	this.solution = null;
 
-	// =================
+	// ===================
 	// Iterative Functions
-	// =================
+	// ===================
 
 	this.forEachCell = (fn = (cell = new _Cell()) => {}) => {
 		for (let row = 1; row <= 9; row++) {
@@ -265,18 +265,29 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	this.tuples = (n = 1) => {
 		// Iterate all houses looking for tuples of n digits in n cells.
 		// Finds first actionable tuple
-		// TODO: Finish this function.
 
-		let _tuple = {
-			name: 'tuple',
-			cells: [], 		// [_Cell, _Cell, ...] (n cells)
-			tuple: [], 		// [x, y, ...] (n candidates)
-			changes: [],	// [[_Cell(), value, candidates], [_Cell(), value, candidates], ...]
-			type: '', 		// 'naked'/'hidden'
-			house: 0,		// 0-9
-			houseType: '',	// 'row'/'col'/'box'
-			class: [, 'single', 'pair', 'triple', 'quad'][n],
-			
+
+		function _Tuple(cells, tuple, changes, type, house, houseType) {
+			this.name = 'TUPLE';
+			this.class = [, 'SINGLE', 'PAIR', 'TRIPLE', 'QUAD'][n];
+
+			// [_Cell, _Cell, ...] (n cells)
+			this.cells = cells || [];
+
+			// [x, y, ...] (n candidates)
+			this.tuple = tuple || [];
+
+			// [[_Cell(), value, candidates], [_Cell(), value, candidates], ...]
+			this.changes = changes || [];
+
+			// 'NAKED'/'HIDDEN'
+			this.type = type || '';
+
+			// 0-9
+			this.house = house || 0;
+
+			// 'ROW'/'COL'/'BOX'
+			this.houseType = houseType|| '';
 		};
 		
 
@@ -289,20 +300,24 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 			// Iterate through every house
 			for (const house of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
 
+				// ====
 				// ROWS
+				// ====
+
 				// Find all naked tuple possibilities in row `house`
 				// The tuple candidates must be the only possible candidates in the cells
 				let nrCells = this.containsCandidates(tuple, house, 0, 0, false, false, true);
 				if (nrCells.length == n) {
+					// ===========
 					// NAKED TUPLE
+					// ===========
 
-					// Keep track of cells "touched" for logging purposes
-					let touched = 0;
+					// Create our _Tuple return object - we now only need to fill _t.changes
+					let _t = new _Tuple(nrCells, tuple, [], 'NAKED', house, 'ROW');
 
 					if (n == 1) {
-						// Naked single; change the cell's value to the sole candidate
-						_tuple.changes.push([nrCells[0], tuple[0], tuple]);
-						touched++;
+						// Naked single; change the cell's value to the sole tuple candidate
+						_t.changes.push([nrCells[0], tuple[0], tuple]);
 					} else {
 						// Otherwise remove all tuple candidates from every other cell in the house
 						this.forEachCellOfRows(house, cell => {
@@ -313,22 +328,154 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 							let candidates = cell.candidates.filter(c => !tuple.includes(c));
 							if (!candidates.equals(cell.candidates)) {
 								// Remove all candidates of our tuple from cell
-								_tuple.changes.push([cell, null, candidates]);
-								touched++;
+								_t.changes.push([cell, null, candidates]);
 							};
 						});
 					};
 
-					// If this tuple instigated changes, return it
-					if (touched) {
-						_tuple.cells = nrCells;
-						_tuple.tuple = tuple;
-						_tuple.type = 'naked';
-						_tuple.house = house;
-						_tuple.houseType = 'row'
+					// If our _Tuple instigated changes, return it
+					if (_t.changes.length) return _t;
+				};
 
-						return _tuple;
+
+				// Find all hidden tuple possibilities in row `house`
+				// There must be non-tuple candidates in at least of the cells
+				let hrCells = this.containsCandidates(tuple, house);
+				if (
+					// Must be a touple of n cells
+					(hrCells.length == n)
+					// Must contain some non-tuple candidates
+					&& (hrCells.some(cell => cell.candidates.some(c => !tuple.includes(c))))
+					// Must contain at least one of each tuple number
+					&& (tuple.every(c => hrCells.some(cell => cell.candidates.includes(c))))
+				) {
+					// ============
+					// HIDDEN TUPLE
+					// ============
+
+					// Create our _Tuple return object - we now only need to fill _t.changes
+					let _t = new _Tuple(hrCells, tuple, [], 'HIDDEN', house, 'ROW');
+
+					if (n == 1) {
+						// Hidden single; change the cell's value to the sole tuple candidate
+						_t.changes.push([hrCells[0], tuple[0], tuple]);
+					} else {
+						// Otherwise remove all non-tuple candidates from hrCells
+						hrCells.forEach(cell => {
+							// Filter the cell candidates so only our tuple remains
+							let candidates = cell.candidates.filter(c => tuple.includes(c));
+							if (!candidates.equals(cell.candidates)) {
+								// Remove all non-tuple candidates
+								_t.changes.push([cell, null, candidates])
+							};
+						});
 					};
+
+					// We know this tuple instigated changes because hidden tuples must contain non-tuple candidates
+					return _t;
+				};
+
+				// Repeat the above for columns and boxes:
+
+
+				// =======
+				// COLUMNS
+				// =======
+
+				let ncCells = this.containsCandidates(tuple, 0, house, 0, false, false, true);
+				if (ncCells.length == n) {
+					// ===========
+					// NAKED TUPLE
+					// ===========
+
+					// The only difference is, we no longer need to check for naked singles
+					// As if they existed they would be found via row
+					let _t = new _Tuple(ncCells, tuple, [], 'NAKED', house, 'COL');
+					this.forEachCellOfCols(house, cell => {
+						if (ncCells.cellIds().includes(cell.id)) return;
+
+						let candidates = cell.candidates.filter(c => !tuple.includes(c));
+						if (!candidates.equals(cell.candidates)) {
+							_t.changes.push([cell, null, candidates]);
+						};
+					});
+					if (_t.changes.length) return _t;
+				};
+
+				let hcCells = this.containsCandidates(tuple, 0, house);
+				if (
+					(hcCells.length == n)
+					&& (hcCells.some(cell => cell.candidates.some(c => !tuple.includes(c))))
+					&& (tuple.every(c => hcCells.some(cell => cell.candidates.includes(c))))
+				) {
+					// ============
+					// HIDDEN TUPLE
+					// ============
+
+					let _t = new _Tuple(hcCells, tuple, [], 'HIDDEN', house, 'COL');
+
+					if (n == 1) {
+						_t.changes.push([hcCells[0], tuple[0], tuple]);
+					} else {
+						hcCells.forEach(cell => {
+							let candidates = cell.candidates.filter(c => tuple.includes(c));
+							if (!candidates.equals(cell.candidates)) {
+								_t.changes.push([cell, null, candidates])
+							};
+						});
+					};
+
+					return _t;
+				};
+
+				// =====
+				// BOXES
+				// =====
+
+				let nbCells = this.containsCandidates(tuple, 0, 0, house, false, false, true);
+				if (nbCells.length == n) {
+					// ===========
+					// NAKED TUPLE
+					// ===========
+
+					// The only difference is, we no longer need to check for naked singles
+					// As if they existed they would be found via row
+					let _t = new _Tuple(nbCells, tuple, [], 'NAKED', house, 'BOX');
+					this.forEachCellOfBoxs(house, cell => {
+						if (nbCells.cellIds().includes(cell.id)) return;
+
+						let candidates = cell.candidates.filter(c => !tuple.includes(c));
+						if (!candidates.equals(cell.candidates)) {
+							_t.changes.push([cell, null, candidates]);
+						};
+					});
+					if (_t.changes.length) return _t;
+				};
+
+				let hbCells = this.containsCandidates(tuple, 0, 0, house);
+				if (
+					(hbCells.length == n)
+					&& (hbCells.some(cell => cell.candidates.some(c => !tuple.includes(c))))
+					&& (tuple.every(c => hbCells.some(cell => cell.candidates.includes(c))))
+				) {
+					// ============
+					// HIDDEN TUPLE
+					// ============
+
+					let _t = new _Tuple(hbCells, tuple, [], 'HIDDEN', house, 'BOX');
+
+					if (n == 1) {
+						_t.changes.push([hbCells[0], tuple[0], tuple]);
+					} else {
+						hbCells.forEach(cell => {
+							let candidates = cell.candidates.filter(c => tuple.includes(c));
+							if (!candidates.equals(cell.candidates)) {
+								_t.changes.push([cell, null, candidates])
+							};
+						});
+					};
+
+					return _t;
 				};
 			};
 		};
@@ -346,13 +493,17 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 			return;
 		};
 
-		let result;
+		this.solution = this.tuples(1);
+		if (this.solution) return;
 
-		result = this.tuples(2);
-		if (result) {
-			this.solution = result;
-			return;
-		};
+		this.solution = this.tuples(2);
+		if (this.solution) return;
+
+		this.solution = this.tuples(3);
+		if (this.solution) return;
+
+		this.solution = this.tuples(4);
+		if (this.solution) return;
 	};
 };
 
