@@ -21,6 +21,9 @@
 		</div>
 
 		<script>
+			// Global Vars
+			var game;
+
 			(function createGrid() {
 				// Create the sudoku grid - including candidates
 				// This is self-invoking
@@ -40,17 +43,17 @@
 						cell.className = 'cell';
 						row.appendChild(cell);
 
-						// Each cell needs a candidate table
-						let candidates = document.createElement('table');
-						candidates.className = 'candidates';
-						cell.appendChild(candidates);
-
 						// Each cell needs an input box
 						let input = document.createElement('input');
 						input.type = 'text';
 						input.maxLength = 1;
 						input.id = `c${i}${j}`;
 						cell.appendChild(input);
+
+						// Each cell needs a candidate table
+						let candidates = document.createElement('table');
+						candidates.className = 'candidates';
+						cell.appendChild(candidates);
 
 						// Populate the candidate table (3x3)
 						// First create 3 rows and store them in a 1-indexed array
@@ -121,27 +124,43 @@
 				};
 
 				console.log(output.join(''));
+				return output.join('');
 			};
 
-			function gridReset() {
+			// TODO: gridReset()
 
-			};
 
 			// ========================
 			// Solver Wrapper Functions
 			// ========================
 
 			function gridInit() {
-
+				game = new _Game(gridExport());
+				syncCandidates();
 			};
 
-			function gridStep() {
+			// TODO: gridStep()
 
+			// TODO: gridCommit()
+
+			// ============
+			// UI Functions
+			// ============
+
+			function syncCandidates() {
+				game.forEachCell(cell => {
+					for (let can = 1; can <= 9; can++) {
+						let element = document.getElementById(`p${cell.id}${can}`);
+
+						if (cell.candidates.includes(can)) element.style.color = 'black';
+							else element.style.color = 'transparent';
+					};
+				});
 			};
 
-			function gridCommit() {
 
-			};
 		</script>
+
+		<script src="solver.js"></script>
 	</body>
 </html>
