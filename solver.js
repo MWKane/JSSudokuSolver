@@ -763,7 +763,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		//	1) Any cell that sees candidates of both states cannot contain that candidate
 		//	2) If a state appears twice in any unit, that state is not the correct solution
 
-		function _Chain(cells, cellStates, changes, rule, onState, candidate) {
+		function _Chain(cells, cellStates, changes, rule, onState, candidate, chain) {
 			this.name = 'CHAIN';
 
 			// [_Cell, _Cell, ...]
@@ -783,6 +783,9 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 
 			// 0-9
 			this.candidate = candidate || 0;
+
+			// [[_Cell, _Cell], [_Cell, _Cell], ...]
+			this.chain = chain || [];
 		};
 
 		
@@ -814,11 +817,11 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 				setState(pair[1], false);
 
 				// Get all cells that are apart of the chain
-				let chain = pairs.flat().filter(cell => cell.simpleState != null);
+				let chain = pairs.flat().filter(cell => cell.simpleState !== null);
 				// Remove duplicates
 				let uChain = [...new Set(chain)];
 
-				let _r = new _Chain(uChain, uChain.map(cell => [cell, cell.simpleState]), [], 0, null, candidate);
+				let _r = new _Chain(uChain, uChain.map(cell => [cell, cell.simpleState]), [], 0, null, candidate, pairs.filter(cell => cell.simpleState !== null));
 
 				// ========
 				// RULE ONE

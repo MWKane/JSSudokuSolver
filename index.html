@@ -20,9 +20,13 @@
 			</div>
 		</div>
 
+		<script src="solver.js"></script>
+		<script src="wz_jsgraphics.js"></script>
+
 		<script>
 			// Global Vars
 			var game;
+			var _graphics = [];
 
 			(function createGrid() {
 				// Create the sudoku grid - including candidates
@@ -247,7 +251,6 @@
 							let state = arr[1];
 							let element = document.getElementById('p' + cell.id + s.candidate);
 							
-
 							if (s.rule == 1) {
 								if (state) element.style.backgroundColor = 'cyan';
 								else element.style.backgroundColor = 'pink';
@@ -256,6 +259,8 @@
 								else element.style.backgroundColor = 'red';
 							};
 						});
+
+						s.chain.forEach(pair => drawLine(...coords(pair[0], s.candidate), ...coords(pair[1], s.candidate), 'magenta', 2));
 					break;
 				};
 			};
@@ -273,11 +278,35 @@
 						};
 					};
 				};
+
+				_graphics.forEach(graphic => graphic.clear());
+				_graphics = [];
 			};
 
+			function drawLine(x1, y1, x2, y2, color = 'black', thickness = 1) {
+				// Wrapper function for line thickness and colour
+				// TODO: Stop this from shifting elements
+				
+				let line = new jsGraphics('grid');
+				line.setStroke(thickness);
+				line.setColor(color)
+				line.drawLine(x1, y1, x2, y2);
+				line.paint();
+				_graphics.push(line);
+			};
 
+			function coords(cell, candidate) {
+				let element;
+				if (candidate) element = document.getElementById('p' + cell.id + candidate);
+				else element.document.getElementById('c' + cell.id);
+
+				let grid = document.getElementById('game').getBoundingClientRect();
+				let rect = element.getBoundingClientRect();
+
+				let x = rect.left + ((rect.right - rect.left) / 2) - grid.left;
+				let y = rect.top + ((rect.bottom - rect.top) / 2) - grid.top;
+				return [x, y];
+			};
 		</script>
-
-		<script src="solver.js"></script>
 	</body>
 </html>
