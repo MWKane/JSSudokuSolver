@@ -198,10 +198,10 @@
 					let val = change[1];
 					let can = change[2];
 
-					if (val) document.getElementById('p' + cell.id + val).style.backgroundColor = 'lime';
+					if (val) highlight('lime', cell, val);
 					else {
 						let candidates = cell.candidates.filter(c => !can.includes(c));
-						candidates.forEach(c => document.getElementById('p' + cell.id + c).style.backgroundColor = 'red')
+						candidates.forEach(c => highlight('red', cell, c))
 					};
 				});
 
@@ -212,9 +212,11 @@
 					case 'TUPLE':
 						console.log(`${(s.type + s.class)} (${s.tuple}): [${s.cells.cellIds()}] ${(s.houseType + s.house)}`);
 
-						s.cells.forEach(cell => {
-							s.tuple.forEach(candidate => document.getElementById('p' + cell.id + candidate).style.backgroundColor = 'yellow');
-						});
+						if (s.class != 'SINGLE') {
+							s.cells.forEach(cell => {
+								s.tuple.forEach(candidate => highlight('yellow', cell, candidate));
+							});
+						};
 					break;
 					
 					// ========
@@ -222,7 +224,7 @@
 					// ========
 					case 'POINTING':
 						console.log(`POINTING ${s.class}: [${s.cells.cellIds()}] BOX${s.box}`);
-						s.cells.forEach(cell => document.getElementById('p' + cell.id + s.candidate).style.backgroundColor = 'yellow');
+						s.cells.forEach(cell => highlight('yellow', cell, s.candidate));
 					break;
 
 					// ==============
@@ -230,7 +232,7 @@
 					// ==============
 					case 'LINEREDUCTION':
 						console.log(`LINE REDUCTION (${s.class}): [${s.cells.cellIds()}] BOX${s.box}`);
-						s.cells.forEach(cell => document.getElementById('p' + cell.id + s.candidate).style.backgroundColor = 'yellow');
+						s.cells.forEach(cell => highlight('yellow', cell, s.candidate));
 					break;
 
 					// ====
@@ -238,7 +240,7 @@
 					// ====
 					case 'FISH':
 						console.log(`${s.class}: [${s.cells.cellIds()}] (${s.type})`);
-						s.cells.forEach(cell => document.getElementById('p' + cell.id + s.candidate).style.backgroundColor = 'yellow');
+						s.cells.forEach(cell => highlight('yellow', cell, s.candidate));
 					break;
 
 					// =====
@@ -249,20 +251,37 @@
 						s.cellStates.forEach(arr => {
 							let cell = arr[0];
 							let state = arr[1];
-							let element = document.getElementById('p' + cell.id + s.candidate);
 							
 							if (s.rule == 1) {
-								if (state) element.style.backgroundColor = 'cyan';
-								else element.style.backgroundColor = 'pink';
+								if (state) highlight('cyan', cell, s.candidate);
+								else highlight('pink', cell, s.candidate);
 							} else {
-								if (state == s.onState) element.style.backgroundColor = 'lime';
-								else element.style.backgroundColor = 'red';
+								if (state == s.onState) highlight('lime', cell, s.candidate);
+								else highlight('red', cell, s.candidate);
 							};
 						});
 
 						s.chain.forEach(pair => drawLine(...coords(pair[0], s.candidate), ...coords(pair[1], s.candidate), 'magenta', 2));
 					break;
+
+					// ======
+					// Y-WING
+					// ======
+					case 'YWING':
+						console.log(`Y-WING (${s.candidate}): [${s.cells.cellIds()}]`);
+						highlight('orange', s.cells[0]); // hinge
+						highlight('yellow', s.cells[1]); // arm1
+						highlight('magenta', s.cells[1], s.candidate); // arm1 Z
+						highlight('yellow', s.cells[2]); // arm2
+						highlight('magenta', s.cells[2], s.candidate); // arm2 Z
+
+					break;
 				};
+			};
+
+			function highlight(color, cell, candidate) {
+				if (candidate) document.getElementById('p' + cell.id + candidate).style.backgroundColor = color;
+				else document.getElementById('c' + cell.id).style.backgroundColor = color;
 			};
 
 			function clearHighlighting() {
@@ -285,7 +304,7 @@
 
 			function drawLine(x1, y1, x2, y2, color = 'black', thickness = 1) {
 				// Wrapper function for line thickness and colour
-				// TODO: Stop this from shifting elements
+				// TODO: Stop this from shifting ui elements
 				
 				let line = new jsGraphics('grid');
 				line.setStroke(thickness);

@@ -649,7 +649,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 			this.name = 'FISH';
 			this.class = [,'HIDDEN SINGLE', 'X-WING', 'SWORDFISH', 'JELLYFISH', 'SQUIRMBAG'][n];
 
-			// [_Cell, _Cell, ...] (n cells)
+			// [_Cell, _Cell, ...]
 			this.cells = cells || [];
 
 			// [[_Cell(), value, candidates], [_Cell(), value, candidates], ...]
@@ -911,6 +911,89 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		return null;
 	};
 
+	this.ywing = () => {
+		// Find bi-value cells linked with the pattern XZ -> XY <- YZ
+		// Where the hinge (XY) can see both arms (XZ, YZ)
+		// But the arms cannot see eachother
+
+
+		function _Ywing(cells, changes, candidate) {
+			this.name = 'YWING';
+
+			// [_Cell (Hinge), _Cell (Arm1), _Cell (Arm2)]
+			this.cells = cells || [];
+
+
+			// [[_Cell(), value, candidates], [_Cell(), value, candidates], ...]
+			this.changes = changes || [];
+
+			// 0-9 (Z value)
+			this.candidate = candidate || 0;
+		};
+
+
+		// Get all bi-value cells
+		let bivalue = [];
+		this.forEachCell(cell => {
+			if (cell.candidates.length == 2) bivalue.push(cell);
+		});
+
+		// Iterate our bi-value cells treating each as the hinge, looking for arms
+		for (const hinge of bivalue) {
+			let x, y, z;
+
+			// Get a list of all possible arms (XZ or YZ candidates)
+			let arms = bivalue.filter(cell => {
+				// Exclude the hinge from possible arms
+				if (cell.id == hinge.id) return false;
+				// Exclude cells with both XY candidates (same as hinge)
+				if (cell.candidates.equals(hinge.candidates)) return false;
+				// Hinge must be able to see the arm && arm has one similar candidate (X || Y)
+				return hinge.sees(cell) && hinge.candidates.some(c => cell.candidates.includes(c));
+			});
+
+			// Iterate our `arms` cells treating each as arm1, looking for possible arm2
+			for (const arm1 of arms) {
+				// Now that we have `hinge` and `arm` defined, we can determine X, Y and Z values
+				// This will be useful for finding possible `arm2`
+				hinge.candidates.forEach(c => {
+					// The candidate found in `hinge` and `arm` is X
+					// The other candidate in `hinge` is Y
+					if (arm1.candidates.includes(c)) x = c;
+					else y = c;
+				});
+				// Determine which candidate of `arm1` is not assigned yet.
+				// This candidate becomes Z
+				if ([x, y].includes(arm1.candidates[0])) z = arm1.candidates[1];
+				else z = arm1.candidates[0];
+
+				// Now that we have XYZ defined, we can find all possible `arm2` cells
+				// The arms cannot see eachother && `arm2` must have YZ candidates
+				let arms2 = arms.filter(cell => !arm1.sees(cell) && cell.candidates.every(c => [y, z].includes(c)));
+
+				// Iterate through possible arm2 cells looking for the first y-wing that instigates changes
+				for (const arm2 of arms2) {
+					let _r = new _Ywing([hinge, arm1, arm2], [], z);
+
+					// Get all cells seen by both arm1 and arm2
+					let intersection = arm1.sees().filter(cell => arm2.sees(cell));
+					// Then iterate through them and check if they contain candidate Z
+					intersection.forEach(cell => {
+						// Exclude cells that don't contain Z
+						if (!cell.candidates.includes(z)) return;
+						// Remove Z from candidates
+						_r.changes.push([cell, null, cell.candidates.remove(z)]);
+					});
+
+					// Check if the ywing instigated changes
+					if (_r.changes.length) return _r;
+				};
+			};
+		};
+
+		return null;
+	};
+
 
 
 	// ==============
@@ -966,6 +1049,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		if (this.solution) return;
 
 		// Y-Wing
+		this.solution = this.ywing();
+		if (this.solution) return;
 
 		// Swordfish
 		this.solution = this.fish(3);
@@ -1066,6 +1151,16 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		return true;
 	}
 	Object.defineProperty(Array.prototype, "equals", {enumerable: false});
+
+
+	// Array.prototype.remove
+	if (Array.prototype.remove) console.warn('Overriding existing Array.prototype.remove method');
+	Array.prototype.remove = function(e) {
+		if (!Array.isArray(e)) e = [e];
+
+		return this.filter(v => !e.includes(v));
+	};
+	Object.defineProperty(Array.prototype, 'remove', {enumerable: false});
 
 	
 	// Array.prototype.cellIds
