@@ -561,7 +561,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	};
 
 	this.lineReduction = () => {
-		// Iterateeach row/col (line) finding a single box that contains all instances of a candidate
+		// Iterate each row/col (line) finding a single box that contains all instances of a candidate
 		// Finds the first actionable line reduction.
 		// This is similar to _Game.Solving.pointing
 
@@ -630,7 +630,132 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		};
 
 		return null;
-	}
+	};
+
+	this.fish = (n) => {
+		// Iterate all lines looking for a formation in which either:
+		//	- cells in n rows exist in n columns
+		//	- cells in n columns exist in n rows
+
+		// Fish have 5 main types:
+		// n = 1: Hidden Single (Basic - also covered in _Game.Solving.tuples)
+		// n = 2: X-Wing (Tough)
+		// n = 3: Swordfish (Tough)
+		// n = 4: Jellyfish (Diabolical)
+		// n = 5: Squirmbag (Esoteric)
+
+
+		function _Fish(cells, changes, type, candidate) {
+			this.name = 'FISH';
+			this.class = [,'HIDDEN SINGLE', 'X-WING', 'SWORDFISH', 'JELLYFISH', 'SQUIRMBAG'][n];
+
+			// [_Cell, _Cell, ...] (n cells)
+			this.cells = cells || [];
+
+			// [[_Cell(), value, candidates], [_Cell(), value, candidates], ...]
+			this.changes = changes || [];
+
+			// 'ROW'/'COL'
+			this.type = type || '';
+
+			// 0-9
+			this.candidate = candidate || 0;
+		};
+
+		// Iterate through each candidate looking for fish
+		for (const candidate of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+			// We will store all row/column tuples of n cells in these arrays
+			let rTuples = [];
+			let cTuples = [];
+
+			// Gather all tuples of n or fewer cells
+			for (const line of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+				// Get all cells with `candidate` in `line`
+				let rCells = this.containsCandidates(candidate, line);
+				let cCells = this.containsCandidates(candidate, 0, line);
+
+				// If there's n or fewer (but not 0) cells in the line, push it to our tuple array
+				if (rCells.length && rCells.length <= n) rTuples.push(rCells);
+				if (cCells.length && cCells.length <= n) cTuples.push(cCells);
+			};
+
+			// There must be equal or greater tuples than n
+			if (rTuples.length >= n) {
+				// Get all index combinations of our tuples and iterate each one
+				let rCombos = Math.combinations(rTuples.length, n);
+				for (const combo of rCombos) {
+					// Get all the cells that make up our prospective fish
+					// `combo` elements are 1-indexed so we must subtract one to find out indexes
+					let fish = combo.map(index => rTuples[index - 1]).flat();
+
+					// Get the unique columns of our fish
+					let cols = [...new Set(fish.map(cell => cell.col))];
+
+					// Test if it has n unique columns
+					if (cols.length == n) {
+						// ==========
+						// FISH (ROW)
+						// ==========
+
+						let _r = new _Fish(fish, [], 'ROW', candidate);
+
+						// Iterate each column of our fish and remove `candidate` from non-fish cells
+						this.forEachCellOfCols(cols, cell => {
+							// Check if cell contains `candidate`
+							if (!cell.candidates.includes(candidate)) return;
+							// Check if cell is part of our fish
+							if (fish.cellIds().includes(cell.id)) return;
+
+							// Remove our candidate from the cell
+							_r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]);
+						});
+						
+						// Check if our fish instigated changes
+						if (_r.changes.length) return _r;
+					};
+				};
+			};
+
+			// Repeat for columns:
+
+			if (cTuples.length >= n) {
+				let cCombos = Math.combinations(cTuples.length, n);
+				for (const combo of cCombos) {
+					// Get all the cells that make up our prospective fish
+					// `combo` elements are 1-indexed so we must subtract one to find out indexes
+					let fish = combo.map(index => cTuples[index - 1]).flat();
+
+					// Get the unique rows of our fish
+					let rows = [...new Set(fish.map(cell => cell.row))];
+
+					// Test if it has n unique rows
+					if (rows.length == n) {
+						// ==========
+						// FISH (COL)
+						// ==========
+
+						let _r = new _Fish(fish, [], 'COL', candidate);
+
+						// Iterate each row of our fish and remove `candidate` from non-fish cells
+						this.forEachCellOfRows(rows, cell => {
+							// Check if cell contains `candidate`
+							if (!cell.candidates.includes(candidate)) return;
+							// Check if cell is part of our fish
+							if (fish.cellIds().includes(cell.id)) return;
+
+							// Remove our candidate from the cell
+							_r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]);
+						});
+						
+						// Check if our fish instigated changes
+						if (_r.changes.length) return _r;
+					};
+				};
+			};
+		};
+
+		return null;
+	};
 
 	// ==============
 	// Game Functions
@@ -646,32 +771,49 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		// SIMPLE STRATEGIES
 		// =================
 
+		// Hidden/Naked Singles
 		this.solution = this.tuples(1);
 		if (this.solution) return;
 
+		// Hidden/Naked Pairs
 		this.solution = this.tuples(2);
 		if (this.solution) return;
 
+		// Hidden/Naked Triples
 		this.solution = this.tuples(3);
 		if (this.solution) return;
 
+		// Hidden/Naked Quads
 		this.solution = this.tuples(4);
 		if (this.solution) return;
 
+		// Pointing Pairs/Triples
 		this.solution = this.pointing();
 		if (this.solution) return;
 
+		// Line Reductions
 		this.solution = this.lineReduction();
 		if (this.solution) return;
 
 		// ================
 		// TOUGH STRATEGIES
 		// ================
+		
+		// X-Wings
+		this.solution = this.fish(2);
+		if (this.solution) return;
 
+		// Swordfish
+		this.solution = this.fish(3);
+		if (this.solution) return;
 
 		// =====================
 		// DIABOLICAL STRATEGIES
 		// =====================
+
+		// Jellyfish
+		this.solution = this.fish(4);
+		if (this.solution) return;
 
 
 		// ===============
@@ -682,6 +824,14 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		//================
 		// TRIAL AND ERROR
 		// ===============
+
+		// ========
+		// ESOTERIC
+		// ========
+		
+		// Squirmbag
+		this.solution = this.fish(5);
+		if (this.solution) return;
 	};
 
 	this.commit = () => {

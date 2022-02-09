@@ -215,6 +215,14 @@
 						console.log(`LINE REDUCTION (${s.class}): [${s.cells.cellIds()}] BOX${s.box}`);
 						s.cells.forEach(cell => document.getElementById('p' + cell.id + s.candidate).style.backgroundColor = 'yellow');
 					break;
+
+					// ====
+					// FISH
+					// ====
+					case 'FISH':
+						console.log(`${s.class}: [${s.cells.cellIds()}] (${s.type})`);
+						s.cells.forEach(cell => document.getElementById('p' + cell.id + s.candidate).style.backgroundColor = 'yellow');
+					break;
 				};
 
 				s.changes.forEach(change => {
