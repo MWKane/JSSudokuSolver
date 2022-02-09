@@ -258,6 +258,76 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	// Solving Functions
 	// =================
 
+	this.singles = () => {
+		// Finds all naked/hidden singles at once
+		// Made to reduce number of steps to solve each puzzle
+
+
+		function _Singles(cells, singles, changes) {
+			this.name = 'SINGLES';
+
+			// [_Cell, ...]
+			this.cells = cells || [];
+
+			// [[_Cell, 'HIDDEN/NAKED', CANDIDATE, 'ROW/COL/BOX', HOUSE], ...]
+			this.singles = singles || [];
+
+			// [[_Cell, value, candidates], ...]
+			this.changes = changes || [];
+		};
+
+
+		let _r = new _Singles([], []);
+
+		// Find all cells with a single candidate (NAKED SINGLES)
+		this.forEachCell(cell => {
+			if (cell.value) return;
+			if (cell.candidates.length == 1) {
+				_r.cells.push(cell)
+				_r.singles.push([cell, 'NAKED', cell.candidates[0], null, null]);
+				_r.changes.push([cell, cell.candidates[0], cell.candidates]);
+			};
+		});
+
+		// Find all candidates with only one cell for a house (HIDDEN SINGLES)
+		for (const candidate of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+			for (const house of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+				let rCells = this.containsCandidates(candidate, house);
+				if (rCells.length == 1) {
+					let cell = rCells[0];
+					if (!_r.cells.cellIds().includes(cell.id)) {
+						_r.cells.push(cell);
+						_r.singles.push([cell, 'HIDDEN', candidate, 'ROW', house]);
+						_r.changes.push([cell, candidate, [candidate]]);
+					};
+				};
+
+				let cCells = this.containsCandidates(candidate, 0, house);
+				if (cCells.length == 1) {
+					let cell = cCells[0];
+					if (!_r.cells.cellIds().includes(cell.id)) {
+						_r.cells.push(cell);
+						_r.singles.push([cell, 'HIDDEN', candidate, 'COL', house]);
+						_r.changes.push([cell, candidate, [candidate]]);
+					};
+				};
+
+				let bCells = this.containsCandidates(candidate, 0, 0, house);
+				if (bCells.length == 1) {
+					let cell = bCells[0];
+					if (!_r.cells.cellIds().includes(cell.id)) {
+						_r.cells.push(cell);
+						_r.singles.push([cell, 'HIDDEN', candidate, 'BOX', house]);
+						_r.changes.push([cell, candidate, [candidate]]);
+					};
+				};
+			};
+		};
+
+		if (_r.changes.length) return _r;
+		else return null;
+	};
+
 	this.tuple = (n = 1) => {
 		// Iterate all houses looking for tuples of n digits in n cells.
 		// Finds first actionable tuple
@@ -493,7 +563,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 			this.name = 'POINTING';
 			this.class = [,,'PAIR', 'TRIPLE'][cells.length];
 
-			// [_Cell, _Cell, ...] (n cells)
+			// [_Cell, _Cell, (_Cell - only if TRIPLE)]
 			this.cells = cells || [];
 
 			// [[_Cell(), value, candidates], [_Cell(), value, candidates], ...]
@@ -570,7 +640,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 			this.name = 'LINEREDUCTION';
 			this.class = [,,'PAIR', 'TRIPLE'][cells.length];
 
-			// [_Cell, _Cell, ...] (n cells)
+			// [_Cell, _Cell, (_Cell - only if TRIPLE)]
 			this.cells = cells || [];
 
 			// [[_Cell(), value, candidates], [_Cell(), value, candidates], ...]
@@ -698,6 +768,9 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 						// ==========
 
 						let _r = new _Fish(fish, [], 'ROW', candidate);
+
+						// Special case for hidden singles, our single fish cell must be `candidate`
+						if (n == 1) _r.changes.push([fish[0], candidate, [candidate]]);
 
 						// Iterate each column of our fish and remove `candidate` from non-fish cells
 						this.forEachCellOfCols(cols, cell => {
@@ -1000,9 +1073,15 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	// Game Functions
 	// ==============
 
-	this.step = () => {
+	this.step = (fn, args = []) => {
 		if (this.solution) {
 			console.warn('_Game.solution already populated - run _Game.commit()');
+			return;
+		};
+
+		// If fn is defined, use that function specifically to solve
+		if (fn) {
+			this.solution = fn(...args);
 			return;
 		};
 
@@ -1011,8 +1090,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		// SIMPLE STRATEGIES
 		// =================
 
-		// Hidden/Naked Singles
-		this.solution = this.tuple(1);
+		// Hidden/Naked Singles (finds all at once)
+		this.solution = this.singles();
 		if (this.solution) return;
 
 		// Hidden/Naked Pairs

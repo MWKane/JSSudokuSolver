@@ -143,9 +143,9 @@
 				syncCandidates();
 			};
 
-			function gridStep() {
+			function gridStep(fn, args) {
 				clearHighlighting();
-				game.step();
+				game.step(fn, args);
 				highlightChanges();
 			};
 
@@ -206,6 +206,17 @@
 				});
 
 				switch (s.name) {
+					// =======
+					// SINGLES
+					// =======
+					case 'SINGLES':
+						s.singles.forEach(arr => {
+							let [cell, type, candidate, houseType, house] = arr;
+							if (type == 'NAKED') console.log(`NAKEDSINGLE (${candidate}): [${cell.id}]`);
+							else console.log(`HIDDENSINGLE (${candidate}): [${cell.id}] ${houseType + house}`);
+						});
+					break;
+
 					// =====
 					// TUPLE
 					// =====
