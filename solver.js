@@ -258,7 +258,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	// Solving Functions
 	// =================
 
-	this.tuples = (n = 1) => {
+	this.tuple = (n = 1) => {
 		// Iterate all houses looking for tuples of n digits in n cells.
 		// Finds first actionable tuple
 
@@ -757,6 +757,159 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		return null;
 	};
 
+	this.chain = () => {
+		// Identify chains of conjugate pairs and apply the following
+		// Starting from any position in the chain, give each candidate a true/false state
+		//	1) Any cell that sees candidates of both states cannot contain that candidate
+		//	2) If a state appears twice in any unit, that state is not the correct solution
+
+		function _Chain(cells, cellStates, changes, rule, onState, candidate) {
+			this.name = 'CHAIN';
+
+			// [_Cell, _Cell, ...]
+			this.cells = cells || [];
+
+			// [[_Cell, state], [_Cell, state], ...]
+			this.cellStates = cellStates || [];
+
+			// [[_Cell(), value, candidates], [_Cell(), value, candidates], ...]
+			this.changes = changes || [];
+
+			// 1/2
+			this.rule = rule || 0;
+
+			// null/true/false
+			this.onState = onState || null;
+
+			// 0-9
+			this.candidate = candidate || 0;
+		};
+
+		
+		// Iterate through all candidates
+		for (const candidate of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+			// Find all conjugate pairs and store them in `pairs`
+			let pairs = [];
+			for (const house of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+				let rCells = this.containsCandidates(candidate, house);
+				let cCells = this.containsCandidates(candidate, 0, house);
+				let bCells = this.containsCandidates(candidate, 0, 0, house);
+
+				if (rCells.length == 2) pairs.push(rCells);
+				if (cCells.length == 2) pairs.push(cCells);
+				if (bCells.length == 2) pairs.push(bCells);
+			};
+
+
+			// There can be multiple chains per candidate
+			// So we iterate through the list of conjugates, removing pairs one chain at a time
+			while (pairs.length) {
+				let pair = pairs[0];
+
+				// Reset all cells' states before we start assigning them
+				this.forEachCell(cell => cell.simpleState = null);
+
+				// Seed the chain by assigning states to the first pair
+				setState(pair[0], true);
+				setState(pair[1], false);
+
+				// Get all cells that are apart of the chain
+				let chain = pairs.flat().filter(cell => cell.simpleState != null);
+				// Remove duplicates
+				let uChain = [...new Set(chain)];
+
+				let _r = new _Chain(uChain, uChain.map(cell => [cell, cell.simpleState]), [], 0, null, candidate);
+
+				// ========
+				// RULE ONE
+				// ========
+				
+				// Iterate all cells and check if they see candidates with both states
+				this.forEachCell(cell => {
+					// Check if the cell contains `candidate`
+					if (!cell.candidates.includes(candidate)) return;
+					// Check if the cell is part of the chain
+					if (cell.simpleState != null) return;
+
+					// Determine whether this cell sees a true/false cell
+					let tState = cell.sees().some(cCell => cCell.simpleState === true);
+					let fState = cell.sees().some(cCell => cCell.simpleState === false);
+
+					if (tState && fState) _r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]);
+				});
+
+				// If this chain has instigated changes, return it
+				if (_r.changes.length) {
+					_r.rule = 1;
+					return _r;
+				};
+
+				// ========
+				// RULE TWO
+				// ========
+
+				// Separate chain cells by their state
+				let tCells = uChain.filter(cell => cell.simpleState);
+				let fCells = uChain.filter(cell => !cell.simpleState);
+
+				// We'll use this to determine if a state is 'on' or not
+				let onState = null;
+
+				// Get array of all houses the true/false cells are in
+				let tRows = tCells.map(cell => cell.row);
+				let tCols = tCells.map(cell => cell.col);
+				let tBoxs = tCells.map(cell => cell.box);
+
+				let fRows = fCells.map(cell => cell.row);
+				let fCols = fCells.map(cell => cell.col);
+				let fBoxs = fCells.map(cell => cell.box);
+
+				// Determine if a state exists more than once in a house
+				if (tRows.length != [...new Set(tRows)].length) onState = false;
+				if (tCols.length != [...new Set(tCols)].length) onState = false;
+				if (tBoxs.length != [...new Set(tBoxs)].length) onState = false;
+
+				if (fRows.length != [...new Set(fRows)].length) onState = true;
+				if (fCols.length != [...new Set(fCols)].length) onState = true;
+				if (fBoxs.length != [...new Set(fBoxs)].length) onState = true;
+
+				// Check if a state is in a house more than once
+				if (onState !== null) {
+					// Iterate through the chain turning the cells on or off
+					uChain.forEach(cell => {
+						if (cell.simpleState == onState) _r.changes.push([cell, candidate, [candidate]]);
+						else _r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]);
+					});
+				};
+				
+				// If this chain has instigated changes, return it
+				
+				if (_r.changes.length) {
+					_r.rule = 2;
+					_r.onState = onState;
+					return _r;
+				};
+
+				// Otherwise remove our chain cells from `pairs`
+				pairs = pairs.filter(p => p[0].simpleState === null && p[1].simpleState === null);
+			};
+
+			function setState(cell, state) {
+				// When we set the state of a cell, all of it's conjugate pairs must have an opposite state
+				
+				cell.simpleState = state;
+				pairs.forEach(pair => {
+					if (pair[0].id == cell.id && pair[1].simpleState === null) setState(pair[1], !state);
+					if (pair[1].id == cell.id && pair[0].simpleState === null) setState(pair[0], !state);
+				});
+			};
+		};
+
+		return null;
+	};
+
+
+
 	// ==============
 	// Game Functions
 	// ==============
@@ -767,24 +920,25 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 			return;
 		};
 
+
 		// =================
 		// SIMPLE STRATEGIES
 		// =================
 
 		// Hidden/Naked Singles
-		this.solution = this.tuples(1);
+		this.solution = this.tuple(1);
 		if (this.solution) return;
 
 		// Hidden/Naked Pairs
-		this.solution = this.tuples(2);
+		this.solution = this.tuple(2);
 		if (this.solution) return;
 
 		// Hidden/Naked Triples
-		this.solution = this.tuples(3);
+		this.solution = this.tuple(3);
 		if (this.solution) return;
 
 		// Hidden/Naked Quads
-		this.solution = this.tuples(4);
+		this.solution = this.tuple(4);
 		if (this.solution) return;
 
 		// Pointing Pairs/Triples
@@ -795,6 +949,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		this.solution = this.lineReduction();
 		if (this.solution) return;
 
+
 		// ================
 		// TOUGH STRATEGIES
 		// ================
@@ -803,17 +958,44 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		this.solution = this.fish(2);
 		if (this.solution) return;
 
+		// Chains (Simple Colouring)
+		this.solution = this.chain();
+		if (this.solution) return;
+
+		// Y-Wing
+
 		// Swordfish
 		this.solution = this.fish(3);
 		if (this.solution) return;
+
+		// Z-Wing
+
+		// Binomial Universal Graveyard (BUG)
+
 
 		// =====================
 		// DIABOLICAL STRATEGIES
 		// =====================
 
+		// X-Cycles
+
+		// XY-Chains
+
+		// 3D Medusa
+
 		// Jellyfish
 		this.solution = this.fish(4);
 		if (this.solution) return;
+
+		// Unique Rectangles
+
+		//Fireworks
+
+		// SK Loops
+
+		// WXYZ Wings
+
+		// Aligned Pair Exclusion
 
 
 		// ===============
@@ -825,9 +1007,12 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		// TRIAL AND ERROR
 		// ===============
 
+
 		// ========
 		// ESOTERIC
 		// ========
+
+		// Gurth's Theorem
 		
 		// Squirmbag
 		this.solution = this.fish(5);
