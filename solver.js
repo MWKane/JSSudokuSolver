@@ -308,12 +308,12 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// NAKED TUPLE
 					// ===========
 
-					// Create our _Tuple return object - we now only need to fill _t.changes
-					let _t = new _Tuple(nrCells, tuple, [], 'NAKED', house, 'ROW');
+					// Create our _Tuple return object - we now only need to fill _r.changes
+					let _r = new _Tuple(nrCells, tuple, [], 'NAKED', house, 'ROW');
 
 					if (n == 1) {
 						// Naked single; change the cell's value to the sole tuple candidate
-						_t.changes.push([nrCells[0], tuple[0], tuple]);
+						_r.changes.push([nrCells[0], tuple[0], tuple]);
 					} else {
 						// Otherwise remove all tuple candidates from every other cell in the house
 						this.forEachCellOfRows(house, cell => {
@@ -324,13 +324,13 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 							let candidates = cell.candidates.filter(c => !tuple.includes(c));
 							if (!candidates.equals(cell.candidates)) {
 								// Remove all candidates of our tuple from cell
-								_t.changes.push([cell, null, candidates]);
+								_r.changes.push([cell, null, candidates]);
 							};
 						});
 					};
 
 					// If our _Tuple instigated changes, return it
-					if (_t.changes.length) return _t;
+					if (_r.changes.length) return _r;
 				};
 
 
@@ -349,12 +349,12 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// HIDDEN TUPLE
 					// ============
 
-					// Create our _Tuple return object - we now only need to fill _t.changes
-					let _t = new _Tuple(hrCells, tuple, [], 'HIDDEN', house, 'ROW');
+					// Create our _Tuple return object - we now only need to fill _r.changes
+					let _r = new _Tuple(hrCells, tuple, [], 'HIDDEN', house, 'ROW');
 
 					if (n == 1) {
 						// Hidden single; change the cell's value to the sole tuple candidate
-						_t.changes.push([hrCells[0], tuple[0], tuple]);
+						_r.changes.push([hrCells[0], tuple[0], tuple]);
 					} else {
 						// Otherwise remove all non-tuple candidates from hrCells
 						hrCells.forEach(cell => {
@@ -362,13 +362,13 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 							let candidates = cell.candidates.filter(c => tuple.includes(c));
 							if (!candidates.equals(cell.candidates)) {
 								// Remove all non-tuple candidates
-								_t.changes.push([cell, null, candidates])
+								_r.changes.push([cell, null, candidates])
 							};
 						});
 					};
 
 					// We know this tuple instigated changes because hidden tuples must contain non-tuple candidates
-					return _t;
+					return _r;
 				};
 
 				// Repeat the above for columns and boxes:
@@ -388,16 +388,16 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// As if they existed they would be found via row
 					if (n == 1) continue;
 
-					let _t = new _Tuple(ncCells, tuple, [], 'NAKED', house, 'COL');
+					let _r = new _Tuple(ncCells, tuple, [], 'NAKED', house, 'COL');
 					this.forEachCellOfCols(house, cell => {
 						if (ncCells.cellIds().includes(cell.id)) return;
 
 						let candidates = cell.candidates.filter(c => !tuple.includes(c));
 						if (!candidates.equals(cell.candidates)) {
-							_t.changes.push([cell, null, candidates]);
+							_r.changes.push([cell, null, candidates]);
 						};
 					});
-					if (_t.changes.length) return _t;
+					if (_r.changes.length) return _r;
 				};
 
 				let hcCells = this.containsCandidates(tuple, 0, house);
@@ -410,20 +410,20 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// HIDDEN TUPLE
 					// ============
 
-					let _t = new _Tuple(hcCells, tuple, [], 'HIDDEN', house, 'COL');
+					let _r = new _Tuple(hcCells, tuple, [], 'HIDDEN', house, 'COL');
 
 					if (n == 1) {
-						_t.changes.push([hcCells[0], tuple[0], tuple]);
+						_r.changes.push([hcCells[0], tuple[0], tuple]);
 					} else {
 						hcCells.forEach(cell => {
 							let candidates = cell.candidates.filter(c => tuple.includes(c));
 							if (!candidates.equals(cell.candidates)) {
-								_t.changes.push([cell, null, candidates])
+								_r.changes.push([cell, null, candidates])
 							};
 						});
 					};
 
-					return _t;
+					return _r;
 				};
 
 				// =====
@@ -440,16 +440,16 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// As if they existed they would be found via row
 					if (n == 1) continue;
 
-					let _t = new _Tuple(nbCells, tuple, [], 'NAKED', house, 'BOX');
+					let _r = new _Tuple(nbCells, tuple, [], 'NAKED', house, 'BOX');
 					this.forEachCellOfBoxs(house, cell => {
 						if (nbCells.cellIds().includes(cell.id)) return;
 
 						let candidates = cell.candidates.filter(c => !tuple.includes(c));
 						if (!candidates.equals(cell.candidates)) {
-							_t.changes.push([cell, null, candidates]);
+							_r.changes.push([cell, null, candidates]);
 						};
 					});
-					if (_t.changes.length) return _t;
+					if (_r.changes.length) return _r;
 				};
 
 				let hbCells = this.containsCandidates(tuple, 0, 0, house);
@@ -462,20 +462,20 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// HIDDEN TUPLE
 					// ============
 
-					let _t = new _Tuple(hbCells, tuple, [], 'HIDDEN', house, 'BOX');
+					let _r = new _Tuple(hbCells, tuple, [], 'HIDDEN', house, 'BOX');
 
 					if (n == 1) {
-						_t.changes.push([hbCells[0], tuple[0], tuple]);
+						_r.changes.push([hbCells[0], tuple[0], tuple]);
 					} else {
 						hbCells.forEach(cell => {
 							let candidates = cell.candidates.filter(c => tuple.includes(c));
 							if (!candidates.equals(cell.candidates)) {
-								_t.changes.push([cell, null, candidates])
+								_r.changes.push([cell, null, candidates])
 							};
 						});
 					};
 
-					return _t;
+					return _r;
 				};
 			};
 		};
@@ -486,6 +486,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	this.pointing = () => {
 		// Iterate each box finding a single row/column that contains all instances of a candidate
 		// Finds first actionable pointing pair/triple
+		// This is similar to _Game.Solving.lineReduction
 
 
 		function _Pointing(cells, changes, candidate, box) {
@@ -520,7 +521,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// POINTING PAIR (ROW)
 					// ===================
 
-					let _p = new _Pointing(cells, [], candidate, box);
+					let _r = new _Pointing(cells, [], candidate, box);
 
 					// Find every cell with `candidate` in `row` (except our pointing cells)
 					let conflicts = this.containsCandidates(candidate, row).filter(cell => cell.box != box);
@@ -528,8 +529,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// Check if we have any cells to change
 					if (conflicts.length) {
 						// Remove `candidate` from all conflicting cells
-						conflicts.forEach(cell => _p.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]));
-						return _p;
+						conflicts.forEach(cell => _r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]));
+						return _r;
 					};
 				};
 
@@ -541,7 +542,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// POINTING PAIR (COL)
 					// ===================
 
-					let _p = new _Pointing(cells, [], candidate, box);
+					let _r = new _Pointing(cells, [], candidate, box);
 
 					// Find every cell with `candidate` in `row` (except our pointing cells)
 					let conflicts = this.containsCandidates(candidate, 0, col).filter(cell => cell.box != box);
@@ -549,8 +550,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// Check if we have any cells to change
 					if (conflicts.length) {
 						// Remove `candidate` from all conflicting cells
-						conflicts.forEach(cell => _p.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]));
-						return _p;
+						conflicts.forEach(cell => _r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]));
+						return _r;
 					};
 				};
 			};
@@ -558,6 +559,78 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 
 		return null;
 	};
+
+	this.lineReduction = () => {
+		// Iterateeach row/col (line) finding a single box that contains all instances of a candidate
+		// Finds the first actionable line reduction.
+		// This is similar to _Game.Solving.pointing
+
+
+		function _Reduction(cells, changes, candidate, box) {
+			this.name = 'LINEREDUCTION';
+			this.class = [,,'PAIR', 'TRIPLE'][cells.length];
+
+			// [_Cell, _Cell, ...] (n cells)
+			this.cells = cells || [];
+
+			// [[_Cell(), value, candidates], [_Cell(), value, candidates], ...]
+			this.changes = changes || [];
+
+			// 0-9
+			this.candidate = candidate || 0;
+			
+			// 0-9
+			this.box = box || 0;
+		};
+
+
+		for (const candidate of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+			for (const line of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+
+				// Get all cells in row `line` with `candidate
+				let rCells = this.containsCandidates(candidate, line);
+				// Check if they're in the same box
+				// NOTE: rCells can be an empty array
+				let rBox = rCells.length ? rCells[0].box : 0;
+				if (rCells.length && rCells.every(cell => cell.box == rBox)) {
+					// ====================
+					// LINE REDUCTION (ROW)
+					// ====================
+
+					let _r = new _Reduction(rCells, [], candidate, rBox);
+
+					// Find every cell with `candidate` in `box` (except our line cells)
+					let conflicts = this.containsCandidates(candidate, 0, 0, rBox).filter(cell => cell.row != line);
+					// Check if we have any cells to change
+					if (conflicts.length) {
+						// Remove `candidate` from all conflicting cells
+						conflicts.forEach(cell => _r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]));
+						return _r;
+					};
+				};
+
+				// Repeat for column:
+
+				let cCells = this.containsCandidates(candidate, 0, line);
+				let cBox = cCells.length ? cCells[0].box : 0;
+				if (cCells.length && cCells.every(cell => cell.box == cBox)) {
+					// ====================
+					// LINE REDUCTION (COL)
+					// ====================
+
+					let _r = new _Reduction(cCells, [], candidate, cBox);
+
+					let conflicts = this.containsCandidates(candidate, 0, 0, cBox).filter(cell => cell.col != line);
+					if (conflicts.length) {
+						conflicts.forEach(cell => _r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]));
+						return _r;
+					};
+				};
+			};
+		};
+
+		return null;
+	}
 
 	// ==============
 	// Game Functions
@@ -568,6 +641,10 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 			console.warn('_Game.solution already populated - run _Game.commit()');
 			return;
 		};
+
+		// =================
+		// SIMPLE STRATEGIES
+		// =================
 
 		this.solution = this.tuples(1);
 		if (this.solution) return;
@@ -583,6 +660,28 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 
 		this.solution = this.pointing();
 		if (this.solution) return;
+
+		this.solution = this.lineReduction();
+		if (this.solution) return;
+
+		// ================
+		// TOUGH STRATEGIES
+		// ================
+
+
+		// =====================
+		// DIABOLICAL STRATEGIES
+		// =====================
+
+
+		// ===============
+		// EVIL STRATEGIES
+		// ===============
+
+
+		//================
+		// TRIAL AND ERROR
+		// ===============
 	};
 
 	this.commit = () => {

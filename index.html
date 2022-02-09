@@ -208,6 +208,13 @@
 						s.cells.forEach(cell => document.getElementById('p' + cell.id + s.candidate).style.backgroundColor = 'yellow');
 					break;
 
+					// ==============
+					// LINE REDUCTION
+					// ==============
+					case 'LINEREDUCTION':
+						console.log(`LINE REDUCTION (${s.class}): [${s.cells.cellIds()}] BOX${s.box}`);
+						s.cells.forEach(cell => document.getElementById('p' + cell.id + s.candidate).style.backgroundColor = 'yellow');
+					break;
 				};
 
 				s.changes.forEach(change => {
