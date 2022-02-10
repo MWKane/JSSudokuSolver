@@ -254,6 +254,18 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		return cells;
 	};
 
+	this.intersection = (eyes = [], excl = false) => {
+		// Get all cells that are seen by every cell in `eyes`
+		// `excl`ude the cells that make up the `eyes`
+
+		// Get all cells seen by the first eye
+		// Filter if all eyes see the cell
+		let intersect = eyes[0].sees().filter(cell => eyes.every(eye => eye.sees(cell)));
+
+		if (!excl) return intersect
+		else return intersect.filter(cell => !eyes.cellIds().includes(cell.id));
+	};
+
 	// =================
 	// Solving Functions
 	// =================
@@ -599,7 +611,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// Check if we have any cells to change
 					if (conflicts.length) {
 						// Remove `candidate` from all conflicting cells
-						conflicts.forEach(cell => _r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]));
+						conflicts.forEach(cell => _r.changes.push([cell, null, cell.candidates.remove(candidate)]));
 						return _r;
 					};
 				};
@@ -620,7 +632,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// Check if we have any cells to change
 					if (conflicts.length) {
 						// Remove `candidate` from all conflicting cells
-						conflicts.forEach(cell => _r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]));
+						conflicts.forEach(cell => _r.changes.push([cell, null, cell.candidates.remove(candidate)]));
 						return _r;
 					};
 				};
@@ -674,7 +686,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// Check if we have any cells to change
 					if (conflicts.length) {
 						// Remove `candidate` from all conflicting cells
-						conflicts.forEach(cell => _r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]));
+						conflicts.forEach(cell => _r.changes.push([cell, null, cell.candidates.remove(candidate)]));
 						return _r;
 					};
 				};
@@ -692,7 +704,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 
 					let conflicts = this.containsCandidates(candidate, 0, 0, cBox).filter(cell => cell.col != line);
 					if (conflicts.length) {
-						conflicts.forEach(cell => _r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]));
+						conflicts.forEach(cell => _r.changes.push([cell, null, cell.candidates.remove(candidate)]));
 						return _r;
 					};
 				};
@@ -780,7 +792,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 							if (fish.cellIds().includes(cell.id)) return;
 
 							// Remove our candidate from the cell
-							_r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]);
+							_r.changes.push([cell, null, cell.candidates.remove(candidate)]);
 						});
 						
 						// Check if our fish instigated changes
@@ -817,7 +829,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 							if (fish.cellIds().includes(cell.id)) return;
 
 							// Remove our candidate from the cell
-							_r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]);
+							_r.changes.push([cell, null, cell.candidates.remove(candidate)]);
 						});
 						
 						// Check if our fish instigated changes
@@ -911,7 +923,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					let tState = cell.sees().some(cCell => cCell.simpleState === true);
 					let fState = cell.sees().some(cCell => cCell.simpleState === false);
 
-					if (tState && fState) _r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]);
+					if (tState && fState) _r.changes.push([cell, null, cell.candidates.remove(candidate)]);
 				});
 
 				// If this chain has instigated changes, return it
@@ -954,7 +966,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					// Iterate through the chain turning the cells on or off
 					uChain.forEach(cell => {
 						if (cell.simpleState == onState) _r.changes.push([cell, candidate, [candidate]]);
-						else _r.changes.push([cell, null, cell.candidates.filter(c => c != candidate)]);
+						else _r.changes.push([cell, null, cell.candidates.remove(candidate)]);
 					});
 				};
 				
@@ -1049,16 +1061,85 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					let _r = new _Ywing([hinge, arm1, arm2], [], z);
 
 					// Get all cells seen by both arm1 and arm2
-					let intersection = arm1.sees().filter(cell => arm2.sees(cell));
+					let intersection = this.intersection([arm1, arm2]);
 					// Then iterate through them and check if they contain candidate Z
 					intersection.forEach(cell => {
-						// Exclude cells that don't contain Z
+						// Exclude cells that don't contain Z (excludes `hinge`)
 						if (!cell.candidates.includes(z)) return;
 						// Remove Z from candidates
 						_r.changes.push([cell, null, cell.candidates.remove(z)]);
 					});
 
 					// Check if the ywing instigated changes
+					if (_r.changes.length) return _r;
+				};
+			};
+		};
+
+		return null;
+	};
+
+	this.zwing = () => {
+		// Similar to the Y-Wing, but in the form of XY -> XYZ -> YZ || XZ
+		// TODO: Potentially combine _Game.Solving.ywing and _Game.Solving.zwing
+
+
+		function _Zwing(cells, changes, candidate) {
+			this.name = 'ZWING';
+
+			// [_Cell (Hinge), _Cell (Arm1), _Cell (Arm2)]
+			this.cells = cells || [];
+
+
+			// [[_Cell(), value, candidates], [_Cell(), value, candidates], ...]
+			this.changes = changes || [];
+
+			// 0-9 (Z value)
+			this.candidate = candidate || 0;
+		};
+
+
+		// Get all bi-value/tri-value cells
+		let bivalue = [];
+		let trivalue = [];
+		this.forEachCell(cell => {
+			if (cell.candidates.length == 2) bivalue.push(cell);
+			if (cell.candidates.length == 3) trivalue.push(cell);
+		});
+
+		// Iterate tri-value cells (hinges) looking for viable arms
+		for (const hinge of trivalue) {
+			// Get all viable arms
+			// Arms must contain only XYZ candidates and must see the hinge
+			let arms = bivalue.filter(cell => cell.candidates.every(c => hinge.candidates.includes(c) && hinge.sees(cell)));
+
+			// Iterate `arms` treating each one as `arm1` while looking for a viable arm2
+			for (const arm1 of arms) {
+				// Find viable arm2 cells
+				// arm1 must not see cell && arm2 cannot be XY
+				let arms2 = arms.filter(cell => !arm1.sees(cell) && !cell.candidates.equals(arm1.candidates));
+
+				// Iterate arms2 checking if the Z-Wing instigates changes
+				for (const arm2 of arms2) {
+					// Get all intersecting cells (must intersect hinge and both arms)
+					let intersection = this.intersection([hinge, arm1, arm2], true);
+					// Get the value of Z
+					let z = arm1.candidates.find(c => arm2.candidates.includes(c));
+
+					let _r = new _Zwing([hinge, arm1, arm2], [], z);
+
+					// Check each intersecting cell and remove any Z candidates
+					intersection.forEach(cell => {
+						// Exclude the hinge
+						if (cell.id == hinge.id) return;
+						// Exclude cells without Z
+						if (!cell.candidates.includes(z)) return;
+
+						// Remove Z from the cell
+						_r.changes.push([cell, null, cell.candidates.remove(z)]);
+					});
+
+					// Check if our Z-Wing instigated changes
 					if (_r.changes.length) return _r;
 				};
 			};
@@ -1136,6 +1217,9 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		if (this.solution) return;
 
 		// Z-Wing
+		this.solution = this.zwing();
+		if (this.solution) return;
+
 
 		// Binomial Universal Graveyard (BUG)
 

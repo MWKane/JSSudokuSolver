@@ -194,9 +194,7 @@
 
 				// Automatic highlighting first so it can be overriden with technique specific highlighting
 				s.changes.forEach(change => {
-					let cell = change[0];
-					let val = change[1];
-					let can = change[2];
+					let [cell, val, can] = change;
 
 					if (val) highlight('lime', cell, val);
 					else {
@@ -286,6 +284,19 @@
 						highlight('yellow', s.cells[2]); // arm2
 						highlight('magenta', s.cells[2], s.candidate); // arm2 Z
 
+					break;
+
+					// ======
+					// Z-WING
+					// ======
+					case 'ZWING':
+					console.log(`Z-WING (${s.candidate}): [${s.cells.cellIds()}]`);
+						highlight('orange', s.cells[0]); // hinge
+						highlight('magenta', s.cells[0], s.candidate); // hinge Z
+						highlight('yellow', s.cells[1]); // arm1
+						highlight('magenta', s.cells[1], s.candidate); // arm1 Z
+						highlight('yellow', s.cells[2]); // arm2
+						highlight('magenta', s.cells[2], s.candidate); // arm2 Z
 					break;
 				};
 			};
