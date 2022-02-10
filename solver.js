@@ -138,6 +138,9 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		[, new _Cell(this, '91', v[72]), new _Cell(this, '92', v[73]), new _Cell(this, '93', v[74]), new _Cell(this, '94', v[75]), new _Cell(this, '95', v[76]), new _Cell(this, '96', v[77]), new _Cell(this, '97', v[78]), new _Cell(this, '98', v[79]), new _Cell(this, '99', v[80])],
 	];
 
+	// Flat grid of cells from 0-80
+	this.cells = this.grid.flatMap(arr => arr.filter(cell => cell));
+
 	// Next step in the solution will be stored here
 	// Format is based on solution.name
 	this.solution = null;
@@ -1148,6 +1151,57 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		return null;
 	};
 
+	this.bug = () => {
+		// When all but one cell is bi-value, the bug cell must be the candidate
+		// that results in a solvable puzzle (a completely bi-value puzzle is unsolvable)
+		
+		// All BUGs can be found via XY-Chains
+
+
+		function _Bug(cells, changes, candidate) {
+			this.name = 'BUG';
+
+			// [_Cell (bug)]
+			this.cells = cells || [];
+
+			// [[_Cell(), value, candidates]]
+			this.changes = changes || [];
+
+			// 0-9 
+			this.candidate = candidate || 0;
+		};
+
+
+		// First, determine if all cells are bi-value with exactly one tri-value cell (the `bug`)
+		let bug;
+		for (const cell of this.cells) {
+			// Exclude cells with values
+			if (cell.value) continue;
+
+			// If this is the first tri-value cell found, it's the bug
+			// If it's not, BUG is not applicable here
+			if (cell.candidates.length == 3) {
+				if (bug) return null;
+				else bug = cell;
+			};
+
+			// If there are any cells over 3 candidates, BUG is not applicable here
+			if (cell.candidates.length > 3) return null;
+		};
+
+		// Check if we found our bug
+		if (!bug) return null;
+
+		// One of the candidates will appear thrice in the row/column/box of the bug
+		let candidate = bug.candidates.find(c => 
+			this.containsCandidates(c, bug.row).length == 3 
+			&& this.containsCandidates(c, 0, bug.col).length == 3 
+			&& this.containsCandidates(c, 0, 0, bug.box).length == 3
+		);
+
+		return new _Bug([bug], [[bug, candidate, [candidate]]], candidate);
+	};
+
 
 
 	// ==============
@@ -1221,9 +1275,6 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		if (this.solution) return;
 
 
-		// Binomial Universal Graveyard (BUG)
-
-
 		// =====================
 		// DIABOLICAL STRATEGIES
 		// =====================
@@ -1263,11 +1314,17 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		// ESOTERIC
 		// ========
 
-		// Gurth's Theorem
-		
 		// Squirmbag
 		this.solution = this.fish(5);
 		if (this.solution) return;
+
+		// Bi-Value Universal Graveyard (BUG)
+		this.solution = this.bug();
+		if (this.solution) return;
+
+		// Gurth's Theorem
+
+
 	};
 
 	this.commit = () => {

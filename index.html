@@ -298,6 +298,15 @@
 						highlight('yellow', s.cells[2]); // arm2
 						highlight('magenta', s.cells[2], s.candidate); // arm2 Z
 					break;
+
+					// ==================================
+					// Bi-Value Universal Graveyard (BUG)
+					// ==================================
+					case 'BUG':
+						console.log(`BUG (${s.candidate}): [${s.cells.cellIds()}]`);
+						highlight('yellow', s.cells[0]);
+						highlight('lime', s.cells[0], s.candidate);
+					break;
 				};
 			};
 
@@ -326,7 +335,7 @@
 
 			function drawLine(x1, y1, x2, y2, color = 'black', thickness = 1) {
 				// Wrapper function for line thickness and colour
-				// TODO: Stop this from shifting ui elements
+				// BUG: This currently shifts ui elements
 				
 				let line = new jsGraphics('grid');
 				line.setStroke(thickness);
