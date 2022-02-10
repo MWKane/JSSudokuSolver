@@ -35,7 +35,10 @@ function _Cell(game = new _Game(), id = '', value = 0) {
 	// Solving Properties
 	// ==================
 	
+	// Used in _Game.Solving.chain and _Game.Solving.xcycle
 	this.simpleState = null;
+	// Used in _Game.Solving.xcycle
+	this.hasWeak = false;
 
 	// =====================
 	// Cell Functions
@@ -83,6 +86,7 @@ function _Cell(game = new _Game(), id = '', value = 0) {
 	// =============================
 
 	this.sees = (cell) => {
+		// Check if `this` sees `cell`
 		if (cell) return (cell.row == this.row || cell.col == this.col || cell.box == this.box);
 
 		let cells = [];
@@ -91,6 +95,37 @@ function _Cell(game = new _Game(), id = '', value = 0) {
 		});
 
 		return cells;
+	};
+
+	this.strong = (candidate, cell) => {
+		// Check if `this` has a strong link with `cell` on `candidate`
+
+		if (this.id == cell.id) return false;
+		if (!cell.candidates.includes(candidate)) return false;
+
+		if (this.row == cell.row) return this.game.containsCandidates(candidate, this.row).length == 2;
+		if (this.col == cell.col) return this.game.containsCandidates(candidate, 0, this.col).length == 2;
+		if (this.box == cell.box) return this.game.containsCandidates(candidate, 0, 0, this.box).length == 2;
+		return false;
+
+		// Code to get all strongly linked cells
+		//let linked = [];
+		//let rCells = this.containsCandidate(candidate, this.row);
+		//if (rCells.length == 2) linked.push(rCells.find(cell => cell.id != this.id));
+		//let cCells = this.containsCandidate(candidate, 0, this.col);
+		//if (cCells.length == 2) linked.push(cCells.find(cell => cell.id != this.id));
+		//let bCells = this.containsCandidate(candidate, 0, 0, this.box);
+		//if (bCells.length == 2) linked.push(bCells.find(cell => cell.id != this.id));
+		//return linked;
+	};
+
+	this.weak = (candidate, cell) => {
+		// Check if `this` has a weak link with `cell` on `candidate`
+
+		if (this.id == cell.id) return false;
+		if (!cell.candidates.includes(candidate)) return false;
+
+		return this.sees(cell) && !this.strong(candidate, cell);
 	};
 
 	// ================
@@ -722,6 +757,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		//	- cells in n rows exist in n columns
 		//	- cells in n columns exist in n rows
 
+		// All fish are also X-Cycles (_Game.Solving.xcycle)
+
 		// Fish have 5 main types:
 		// n = 1: Hidden Single (Basic - also covered in _Game.Solving.tuples)
 		// n = 2: X-Wing (Tough)
@@ -1202,6 +1239,124 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		return new _Bug([bug], [[bug, candidate, [candidate]]], candidate);
 	};
 
+	this.xcycle = () => {
+		// Find all strong links (conjugate pairs) between cells and try to form a loop using weak links
+		// TODO: Currently only finds RULE 1, add RULE 2 & 3
+		// TODO: Comment this
+
+
+		// Nice Loops [RULE 1] - Continuous (strong -> weak -> strong -> weak -^)
+		// Nice Loops [RULE 2] - Discontinuous Strong (strong -> weak -> strong -> strong -> weak -^) 
+		// Nice Loops [RULE 3] - Discontinuous Weak (strong -> weak -> strong -> weak -> weak -^)
+
+		
+		function _Xcycle(cells, changes, candidate, strongs, weaks) {
+			this.name = 'XCYCLE';
+
+			// [_Cell, ...]
+			this.cells = cells || [];
+
+			// [[_Cell(), value, candidates], ...]
+			this.changes = changes || [];
+
+			// 0-9 
+			this.candidate = candidate || 0;
+
+			// [[_Cell, _Cell], ...]
+			this.strongs = strongs || [];
+			
+			// [[_Cell, _Cell], ...]
+			this.weaks = weaks || [];
+		};
+
+
+		for (const candidate of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+			let pairs = [];
+			for (const house of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+				let rCells = this.containsCandidates(candidate, house);
+				let cCells = this.containsCandidates(candidate, 0, house);
+				let bCells = this.containsCandidates(candidate, 0, 0, house);
+	
+				if (rCells.length == 2) pairs.push(rCells);
+				if (cCells.length == 2) pairs.push(cCells);
+				if (bCells.length == 2) pairs.push(bCells);
+			};
+			
+			for (let k = 2; k <= pairs.length; k++) {
+				for (const combo of Math.combinations(pairs.length, k)) {
+					let strongs = combo.map(index => pairs[index - 1]);
+					let weaks = [];
+					let xcycle = strongs.flat();
+
+					this.forEachCell(cell => {
+						cell.hasWeak = false;
+						cell.simpleState = null;
+					});
+
+					setState(strongs[0][0], true);
+					setState(strongs[0][1], false);
+
+					let continuous = strongs.every(pair => {
+						let [strong1, strong2] = pair;
+
+						if (!strong1.hasWeak) {
+							let weak1 = xcycle.find(cell => strong1.weak(candidate, cell));
+
+							if (weak1 && !weak1.hasWeak) {
+								strong1.hasWeak = true;
+								weak1.hasWeak = true;
+								weaks.push([strong1, weak1]);
+							} else return false;
+						};
+
+						if (!strong2.hasWeak) {
+							let weak2 = xcycle.find(cell => strong2.weak(candidate, cell));
+
+							if (weak2 && !weak2.hasWeak) {
+								strong2.hasWeak = true;
+								weak2.hasWeak = true;
+								weaks.push([strong2, weak2]);
+							} else return false;
+						};
+
+						return true;
+					});
+					if (!continuous) continue;
+
+					let _r = new _Xcycle(strongs.flat(), [], candidate, strongs, weaks);
+
+					this.forEachCell(cell => {
+						// Check if the cell contains `candidate`
+						if (!cell.candidates.includes(candidate)) return;
+						// Check if the cell is part of the xcycle
+						if (xcycle.cellIds().includes(cell.id)) return;
+	
+						// Determine whether this cell sees a true/false cell
+						let tState = cell.sees().some(cCell => cCell.simpleState === true);
+						let fState = cell.sees().some(cCell => cCell.simpleState === false);
+	
+						if (tState && fState) _r.changes.push([cell, null, cell.candidates.remove(candidate)]);
+					});
+
+					if (_r.changes.length) return _r;
+
+
+					function setState(cell, state) {
+						cell.simpleState = state;
+						
+						xcycle.forEach(link => {
+							if (link.simpleState !== null) return;
+
+							if (cell.strong(candidate, link)) setState(link, !state);
+							if (cell.weak(candidate, link) && state) setState(link, false);
+						});
+					};
+				};
+			};
+		};
+
+		return null;
+	};
 
 
 	// ==============
@@ -1280,6 +1435,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		// =====================
 
 		// X-Cycles
+		this.solution = this.xcycle();
+		if (this.solution) return;
 
 		// XY-Chains
 

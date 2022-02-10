@@ -14,9 +14,9 @@
 				<button onClick="gridImport()">Import</button>
 				<button onClick="gridExport()">Export</button>
 				<br /><br />
-				<button onClick="gridInit()">Init</button>
-				<button onClick="gridStep()">Step</button>
-				<button onClick="gridCommit()">Commit</button>
+				<button onClick="init()">Init</button>
+				<button onClick="step()">Step</button>
+				<button onClick="commit()">Commit</button>
 			</div>
 		</div>
 
@@ -138,18 +138,18 @@
 			// Solver Wrapper Functions
 			// ========================
 
-			function gridInit() {
+			function init() {
 				game = new _Game(gridExport());
 				syncCandidates();
 			};
 
-			function gridStep(fn, args) {
+			function step(fn, args) {
 				clearHighlighting();
 				game.step(fn, args);
 				highlightChanges();
 			};
 
-			function gridCommit() {
+			function commit() {
 				clearHighlighting();
 				game.commit();
 				syncValues();
@@ -307,6 +307,20 @@
 						highlight('yellow', s.cells[0]);
 						highlight('lime', s.cells[0], s.candidate);
 					break;
+					
+					// =======
+					// X-CYCLE
+					// =======
+					case 'XCYCLE':
+						console.log(`XCYCLE (${s.candidate}): [${s.cells.cellIds()}]`);
+						s.cells.forEach(cell => {
+							if (cell.simpleState) highlight('cyan', cell, s.candidate);
+							else highlight('pink', cell, s.candidate);
+						});
+
+						s.strongs.forEach(pair => drawLine(...coords(pair[0], s.candidate), ...coords(pair[1], s.candidate), 'magenta', 3));
+						s.weaks.forEach(pair => drawLine(...coords(pair[0], s.candidate), ...coords(pair[1], s.candidate), 'pink', 2));
+					break;
 				};
 			};
 
@@ -335,9 +349,8 @@
 
 			function drawLine(x1, y1, x2, y2, color = 'black', thickness = 1) {
 				// Wrapper function for line thickness and colour
-				// BUG: This currently shifts ui elements
 				
-				let line = new jsGraphics('grid');
+				let line = new jsGraphics('game');
 				line.setStroke(thickness);
 				line.setColor(color)
 				line.drawLine(x1, y1, x2, y2);
