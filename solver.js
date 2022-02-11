@@ -1240,17 +1240,16 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	};
 
 	this.xcycle = () => {
-		// Find all strong links (conjugate pairs) between cells and try to form a loop using weak links
-		// TODO: Currently only finds RULE 1, add RULE 2 & 3
+		// Find all strong links (conjugate pairs) between cells and try to form a loop using weak/strong links
 		// TODO: Comment this
 
 
-		// Nice Loops [RULE 1] - Continuous (strong -> weak -> strong -> weak -^)
-		// Nice Loops [RULE 2] - Discontinuous Strong (strong -> weak -> strong -> strong -> weak -^) 
-		// Nice Loops [RULE 3] - Discontinuous Weak (strong -> weak -> strong -> weak -> weak -^)
+		// Nice Loop [RULE 1] - Continuous (strong -> weak -> strong -> weak -^)
+		// Nice Loop [RULE 2] - Discontinuous Strong (strong -> weak -> strong -> strong -> weak -^) 
+		// Nice Loop [RULE 3] - Discontinuous Weak (strong -> weak -> strong -> weak -> weak -^)
 
 		
-		function _Xcycle(cells, changes, candidate, strongs, weaks) {
+		function _Xcycle(cells, changes, candidate, strongs, weaks, rule, ruleCell) {
 			this.name = 'XCYCLE';
 
 			// [_Cell, ...]
@@ -1267,6 +1266,12 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 			
 			// [[_Cell, _Cell], ...]
 			this.weaks = weaks || [];
+
+			// 1/2/3
+			this.rule = rule || 0;
+
+			// _Cell
+			this.ruleCell = ruleCell || null;
 		};
 
 
@@ -1282,8 +1287,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 				if (bCells.length == 2) pairs.push(bCells);
 			};
 			
-			for (let k = 2; k <= pairs.length; k++) {
-				for (const combo of Math.combinations(pairs.length, k)) {
+			for (let r = 1; r <= pairs.length; r++) {
+				for (const combo of Math.combinations(pairs.length, r)) {
 					let strongs = combo.map(index => pairs[index - 1]);
 					let weaks = [];
 					let xcycle = strongs.flat();
@@ -1295,8 +1300,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 
 					setState(strongs[0][0], true);
 					setState(strongs[0][1], false);
-
-					let continuous = strongs.every(pair => {
+					
+					strongs.forEach(pair => {
 						let [strong1, strong2] = pair;
 
 						if (!strong1.hasWeak) {
@@ -1306,7 +1311,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 								strong1.hasWeak = true;
 								weak1.hasWeak = true;
 								weaks.push([strong1, weak1]);
-							} else return false;
+							};
 						};
 
 						if (!strong2.hasWeak) {
@@ -1316,29 +1321,59 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 								strong2.hasWeak = true;
 								weak2.hasWeak = true;
 								weaks.push([strong2, weak2]);
-							} else return false;
+							};
 						};
-
-						return true;
 					});
-					if (!continuous) continue;
+					let continuous = strongs.every(pair => pair[0].hasWeak && pair[1].hasWeak);
 
 					let _r = new _Xcycle(strongs.flat(), [], candidate, strongs, weaks);
 
-					this.forEachCell(cell => {
-						// Check if the cell contains `candidate`
-						if (!cell.candidates.includes(candidate)) return;
-						// Check if the cell is part of the xcycle
-						if (xcycle.cellIds().includes(cell.id)) return;
+					if (continuous) {
+						// ===============================
+						// NICE LOOP [RULE 1] - CONTINUOUS
+						// ===============================
+
+						_r.rule = 1;
+						
+						this.forEachCell(cell => {
+							// Check if the cell contains `candidate`
+							if (!cell.candidates.includes(candidate)) return;
+							// Check if the cell is part of the xcycle
+							if (xcycle.cellIds().includes(cell.id)) return;
+		
+							// Determine whether this cell sees a true/false cell
+							let tState = cell.sees().some(cCell => cCell.simpleState === true);
+							let fState = cell.sees().some(cCell => cCell.simpleState === false);
+		
+							if (tState && fState) _r.changes.push([cell, null, cell.candidates.remove(candidate)]);
+						});
 	
-						// Determine whether this cell sees a true/false cell
-						let tState = cell.sees().some(cCell => cCell.simpleState === true);
-						let fState = cell.sees().some(cCell => cCell.simpleState === false);
-	
-						if (tState && fState) _r.changes.push([cell, null, cell.candidates.remove(candidate)]);
-					});
+					} else {
+						let failed = xcycle.filter(cell => !cell.hasWeak);
+						if (failed.every(cell => cell.id == failed[0].id)) {
+							// =========================================
+							// NICE LOOP [RULE 2] - DISCONTINUOUS STRONG
+							// =========================================
+							_r.rule = 2;
+							_r.ruleCell = failed[0];
+							_r.changes.push([_r.ruleCell, candidate, [candidate]]);
+
+						} else if (failed.length == 2) {
+							let intersects = this.intersection(failed, true);
+							intersects.forEach(cell => {
+								if (!cell.candidates.includes(candidate)) return;
+								// =======================================
+								// NICE LOOP [RULE 3] - DISCONTINUOUS WEAK
+								// =======================================
+								_r.rule = 3;
+								_r.changes.push([cell, null, cell.candidates.remove(candidate)]);
+								_r.weaks.push([failed[0], cell], [failed[1], cell]);
+							});
+						};
+					};
 
 					if (_r.changes.length) return _r;
+
 
 
 					function setState(cell, state) {
@@ -1354,6 +1389,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 				};
 			};
 		};
+		
 
 		return null;
 	};
@@ -1549,23 +1585,47 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 
 
 	// Math.combinations
+	// TODO: Change this to have 0-indexing
 	if (Math.combinations) console.warn('Overriding existing Math.combinations method');
-	Math.combinations = (n, k) => {
+	Math.combinations = (n, r) => {
 		const result = [];
 		const combos = [];
 		const recurse = start => {
-			if (combos.length + (n - start + 1) < k) return;
+			if (combos.length + (n - start + 1) < r) return;
 			recurse(start + 1);
 			combos.push(start);
-			if (combos.length === k) {     
+			if (combos.length === r) {     
 				result.push(combos.slice());
-			} else if(combos.length + (n - start + 2) >= k) {
+			} else if(combos.length + (n - start + 2) >= r) {
 				recurse(start + 1);
 			};
-			combos.pop();     
+			combos.pop();
 		};
 		recurse(1, combos);
 		return result;
 	};
 	Object.defineProperty(Math, 'combinations', {enumerable: false});
+
+	// Math.permutations
+	if (Math.permutations) console.warn('Overriding existing Math.permutations method');
+	Math.permutations = (n, r) => {
+		let result = [];
+		let digits = Array(r).fill(0);
+
+		while (digits.at(-1) < n) {
+			digits[0]++;
+			digits.forEach((v, i) => {
+				if (v >= n) {
+					digits[i+1]++;
+					digits[i] = 0;
+				};
+			});
+
+			if ([...new Set(digits)].length != digits.length) continue;
+			else result.push([...digits]);
+		};
+
+		return result;
+	};
+	Object.defineProperty(Math, 'permutations', {enumerable: false});
 })();

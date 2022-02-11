@@ -320,6 +320,7 @@
 
 						s.strongs.forEach(pair => drawLine(...coords(pair[0], s.candidate), ...coords(pair[1], s.candidate), 'magenta', 3));
 						s.weaks.forEach(pair => drawLine(...coords(pair[0], s.candidate), ...coords(pair[1], s.candidate), 'pink', 2));
+						if (s.rule == 2) highlight('lime', s.ruleCell, s.candidate);
 					break;
 				};
 			};
