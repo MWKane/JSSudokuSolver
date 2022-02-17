@@ -256,6 +256,7 @@
 					// CHAIN
 					// =====
 					case 'CHAIN':
+						// BUG: Shows all chains of `candidate`
 						console.log(`CHAIN (${s.candidate}): [${s.cells.cellIds()}] RULE${s.rule}`);
 						s.cellStates.forEach(arr => {
 							let cell = arr[0];
@@ -321,6 +322,19 @@
 						s.strongs.forEach(pair => drawLine(...coords(pair[0], s.candidate), ...coords(pair[1], s.candidate), 'magenta', 3));
 						s.weaks.forEach(pair => drawLine(...coords(pair[0], s.candidate), ...coords(pair[1], s.candidate), 'pink', 2));
 						if (s.rule == 2) highlight('lime', s.ruleCell, s.candidate);
+					break;
+
+					// ========
+					// XY-CHAIN
+					// ========
+					case 'XYCHAIN':
+						console.log(`XYCHAIN (${s.candidate}): [${s.cells.cellIds()}]`);
+						s.chain.forEach((link, index) => {
+							drawLine(...coords(link.cell, link.backward), ...coords(link.cell, link.forward), 'pink', 3);
+							if (index != s.chain.length - 1) drawLine(...coords(link.cell, link.forward), ...coords(s.chain[index+1].cell, link.forward), 'magenta', 2);
+							highlight('cyan', link.cell, link.backward);
+							highlight('pink', link.cell, link.forward);
+						});
 					break;
 				};
 			};

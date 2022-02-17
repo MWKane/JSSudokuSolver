@@ -412,7 +412,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		// n = 2: 36 combos
 		// n = 3: 84 combos
 		// n = 4: 126 combos
-		for (const tuple of Math.combinations(9, n)) {
+		for (const tuple of Math.combinations(9, n, 1)) {
 			// Iterate through every house
 			for (const house of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
 
@@ -808,7 +808,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 				for (const combo of rCombos) {
 					// Get all the cells that make up our prospective fish
 					// `combo` elements are 1-indexed so we must subtract one to find out indexes
-					let fish = combo.map(index => rTuples[index - 1]).flat();
+					let fish = combo.map(index => rTuples[index]).flat();
 
 					// Get the unique columns of our fish
 					let cols = [...new Set(fish.map(cell => cell.col))];
@@ -848,7 +848,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 				for (const combo of cCombos) {
 					// Get all the cells that make up our prospective fish
 					// `combo` elements are 1-indexed so we must subtract one to find out indexes
-					let fish = combo.map(index => cTuples[index - 1]).flat();
+					let fish = combo.map(index => cTuples[index]).flat();
 
 					// Get the unique rows of our fish
 					let rows = [...new Set(fish.map(cell => cell.row))];
@@ -1242,6 +1242,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	this.xcycle = () => {
 		// Find all strong links (conjugate pairs) between cells and try to form a loop using weak/strong links
 		// TODO: Comment this
+		// BUG: Finds weak xcycle instead of strong: 804537000023614085605982034000105870500708306080203450200859003050371208008426507
+		// BUG: Simple states don't propogate consistently on rule 3 - this just affects ui highlighting
 
 
 		// Nice Loop [RULE 1] - Continuous (strong -> weak -> strong -> weak -^)
@@ -1289,7 +1291,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 			
 			for (let r = 1; r <= pairs.length; r++) {
 				for (const combo of Math.combinations(pairs.length, r)) {
-					let strongs = combo.map(index => pairs[index - 1]);
+					let strongs = combo.map(index => pairs[index]);
 					let weaks = [];
 					let xcycle = strongs.flat();
 
@@ -1394,6 +1396,94 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		return null;
 	};
 
+	this.xychain = () => {
+		// Try to find two bi-value cells containing a candidate and link them with more bi-value cells
+		// TODO: Comment this
+
+
+		function _Xychain(cells, changes, candidate, chain) {
+			this.name = 'XYCHAIN';
+
+			// [_Cell, ...]
+			this.cells = cells || [];
+
+			// [[_Cell(), value, candidates], ...]
+			this.changes = changes || [];
+
+			// 0-9 
+			this.candidate = candidate || 0;
+
+			// [_Link, ...]
+			this.chain = chain || [];
+		};
+
+
+		let bivalues = [];
+		this.forEachCell(cell => {
+			if (cell.candidates.length == 2) bivalues.push(cell);
+		});
+
+		for (const candidate of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+			let targets = bivalues.filter(cell => cell.candidates.includes(candidate));
+			if (targets.length < 2) continue;
+
+			for (const combo of Math.combinations(targets.length, 2)) {
+				function _Link(cell, backward, forward) {
+					this.cell = cell;
+					this.backward = backward || 0;
+					this.forward = forward || 0;
+				};
+
+				let start = targets[combo[0]];
+				let end = targets[combo[1]];
+				let startL = new _Link(start, candidate, start.candidates.find(c => c != candidate));
+				let endL = new _Link(end, end.candidates.find(c => c != candidate), candidate);
+
+				
+
+				let intersection = this.intersection([start, end], true).filter(cell => cell.candidates.includes(candidate));
+				if (!intersection.length) continue;
+
+
+				let found = false;
+				let chain = [];
+
+				function recurse(curr) {
+					if (found) return;
+					chain.push(curr);
+
+					if (curr.cell.sees(end) && curr.forward == endL.backward) {
+						found = true;
+						chain.push(endL);
+						return;
+					};
+					
+					let next = bivalues.filter(cell => {
+						return (
+							chain.every(link => link.cell.id != cell.id)
+							&& cell.candidates.includes(curr.forward)
+							&& cell.sees(curr.cell)
+							&& cell.id != end.id
+						);
+					});
+					next.forEach(cell => recurse(new _Link(cell, curr.forward, cell.candidates.find(c => c != curr.forward))));
+					if (found) return;
+					else chain.pop();
+				};
+				recurse(startL);
+
+				if (chain.length) {
+					let _r = new _Xychain(chain.map(link => link.cell), [], candidate, chain);
+					intersection.forEach(cell => _r.changes.push([cell, null, cell.candidates.remove(candidate)]));
+					return _r;
+				};
+			};
+		};
+
+		return null;
+	};
+
+
 
 	// ==============
 	// Game Functions
@@ -1475,6 +1565,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		if (this.solution) return;
 
 		// XY-Chains
+		this.solution = this.xychain();
+		if (this.solution) return;
 
 		// 3D Medusa
 
@@ -1585,39 +1677,38 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 
 
 	// Math.combinations
-	// TODO: Change this to have 0-indexing
 	if (Math.combinations) console.warn('Overriding existing Math.combinations method');
-	Math.combinations = (n, r) => {
+	Math.combinations = (n, r, index = 0) => {
 		const result = [];
 		const combos = [];
 		const recurse = start => {
-			if (combos.length + (n - start + 1) < r) return;
+			if (combos.length + (n - start + index) < r) return;
 			recurse(start + 1);
 			combos.push(start);
 			if (combos.length === r) {     
 				result.push(combos.slice());
-			} else if(combos.length + (n - start + 2) >= r) {
+			} else if(combos.length + (n - start + 1 + index) >= r) {
 				recurse(start + 1);
 			};
 			combos.pop();
 		};
-		recurse(1, combos);
+		recurse(index, combos);
 		return result;
 	};
 	Object.defineProperty(Math, 'combinations', {enumerable: false});
 
 	// Math.permutations
 	if (Math.permutations) console.warn('Overriding existing Math.permutations method');
-	Math.permutations = (n, r) => {
+	Math.permutations = (n, r, index = 0) => {
 		let result = [];
-		let digits = Array(r).fill(0);
+		let digits = Array(r).fill(index);
 
 		while (digits.at(-1) < n) {
 			digits[0]++;
 			digits.forEach((v, i) => {
 				if (v >= n) {
 					digits[i+1]++;
-					digits[i] = 0;
+					digits[i] = index;
 				};
 			});
 
