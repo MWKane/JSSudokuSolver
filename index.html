@@ -330,10 +330,12 @@
 					case 'XYCHAIN':
 						console.log(`XYCHAIN (${s.candidate}): [${s.cells.cellIds()}]`);
 						s.chain.forEach((link, index) => {
-							drawLine(...coords(link.cell, link.backward), ...coords(link.cell, link.forward), 'pink', 3);
-							if (index != s.chain.length - 1) drawLine(...coords(link.cell, link.forward), ...coords(s.chain[index+1].cell, link.forward), 'magenta', 2);
+							drawLine(...coords(link.cell, link.backward), ...coords(link.cell, link.forward), 'red', 2);
+							if (index != s.chain.length - 1) drawLine(...coords(link.cell, link.forward), ...coords(s.chain[index+1].cell, link.forward), 'magenta', 1);
 							highlight('cyan', link.cell, link.backward);
 							highlight('pink', link.cell, link.forward);
+							highlight('yellow', s.start);
+							highlight('yellow', s.end);
 						});
 					break;
 
@@ -342,7 +344,7 @@
 					// =========
 					case '3DMEDUSA':
 						console.log(`3D-MEDUSA: [${s.cells.cellIds()}] RULE${s.rule}`);
-						if ([3, 4, 5, 6].includes(s.rule)) {
+						if (![1, 2, 6].includes(s.rule)) {
 							s.cells.forEach(cell => {
 								for (const [key, value] of Object.entries(cell.complexState)) {
 									if (value === true) highlight('cyan', cell, key);
