@@ -35,10 +35,22 @@ function _Cell(game = new _Game(), id = '', value = 0) {
 	// Solving Properties
 	// ==================
 	
-	// Used in _Game.Solving.chain and _Game.Solving.xcycle
+	// Used in _Game.Solving.chain, _Game.Solving.xcycle and _Game.Solving.medusa
 	this.simpleState = null;
 	// Used in _Game.Solving.xcycle
 	this.hasWeak = false;
+	// Used in _Game.Solving.medusa
+	this.complexState = {
+		1: null,
+		2: null,
+		3: null,
+		4: null,
+		5: null,
+		6: null,
+		7: null,
+		8: null,
+		9: null
+	};
 
 	// =====================
 	// Cell Functions
@@ -1439,11 +1451,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 				let startL = new _Link(start, candidate, start.candidates.find(c => c != candidate));
 				let endL = new _Link(end, end.candidates.find(c => c != candidate), candidate);
 
-				
-
 				let intersection = this.intersection([start, end], true).filter(cell => cell.candidates.includes(candidate));
 				if (!intersection.length) continue;
-
 
 				let found = false;
 				let chain = [];
@@ -1477,6 +1486,179 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					intersection.forEach(cell => _r.changes.push([cell, null, cell.candidates.remove(candidate)]));
 					return _r;
 				};
+			};
+		};
+
+		return null;
+	};
+
+	this.medusa = () => {
+		// Establish chains between bi-value, weak and stronly linked cells
+
+		// RULE 1: Two candidates in cell same colour
+		// RULE 2: Two candidates in house same colour
+		// RULE 3: Two colours in same cell
+		// RULE 4: Candidate in cell seen by two colours
+		// RULE 5: One colour in cell, other colour seen
+		// RULE 6: All candidates in cell eliminated by one colour
+
+
+		function _Medusa(cells, changes, strongs, weaks, inters, rule, contradiction) {
+			this.name = '3DMEDUSA';
+
+			// [_Cell, ...]
+			this.cells = cells || [];
+
+			// [[_Cell(), value, candidates], ...]
+			this.changes = changes || [];
+
+			// [[_Cell(), _Cell(), candidate], ...]
+			this.strongs = strongs || [];
+
+			// [[_Cell(), _Cell(), candidate], ...]
+			this.weaks = weaks || [];
+
+			// [[_Cell(), cadidate1, candidate2], ...]
+			this.inters = inters || [];
+
+			// 1/2/3/4/5/6
+			this.rule = rule || 0;
+
+			// [_Cell(), ...]
+			this.contradiction = contradiction || [];
+		};
+
+
+		let bivalues = [];
+		this.forEachCell(cell => {
+			if (cell.candidates.length == 2) bivalues.push(cell);
+		});
+
+		for (const start of bivalues) {
+			console.log(start);
+			this.forEachCell(cell => {
+				cell.simpleState = null;
+				for (let i = 1; i <= 9; i++) cell.complexState[i] = null;
+			});
+
+			let _r = new _Medusa();
+			setState(start, start.candidates[0], true);
+			_r.cells = this.cells.filter(cell => cell.simpleState);
+			
+
+			let onState = null;
+
+			// RULE 1
+			this.forEachCell(cell => {
+				let tCan = Object.entries(cell.complexState).filter(entry => entry[1] === true);
+				if (tCan.length > 1) {
+					onState = false;
+					_r.contradiction.push(cell);
+				};
+
+				let fCan = Object.entries(cell.complexState).filter(entry => entry[1] === false);
+				if (fCan.length > 1) {
+					onState = true;
+					_r.contradiction.push(cell);
+				};
+			});
+			if (onState !== null) {
+				_r.cells.forEach(cell => {
+					for (const [key, value] of Object.entries(cell.complexState)) {
+						if (value === null) continue;
+						let candidate = parseInt(key);
+						if (value === onState) _r.changes.push([cell, candidate, [candidate]]);
+						else _r.changes.push([cell, null, cell.candidates.remove(candidate)]);
+					};
+				});
+			};
+			if (_r.changes.length) {
+				_r.rule = 1;
+				return _r;
+			};
+
+
+			// RULE 2
+			for (const candidate of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+				let tCells = _r.cells.filter(cell => cell.complexState[candidate] === true);
+				let fCells = _r.cells.filter(cell => cell.complexState[candidate] === false);
+
+				let tRows = tCells.map(cell => cell.row);
+				let tCols = tCells.map(cell => cell.col);
+				let tBoxs = tCells.map(cell => cell.box);
+
+				let fRows = fCells.map(cell => cell.row);
+				let fCols = fCells.map(cell => cell.col);
+				let fBoxs = fCells.map(cell => cell.box);
+
+				if (tRows.length != [...new Set(tRows)].length) {
+					onState = false;
+					_r.contradiction.push(...tCells.filter(cell => tRows.filter(n => n == cell.row).length > 1));
+				};
+				if (tCols.length != [...new Set(tCols)].length) {
+					onState = false;
+					_r.contradiction.push(...tCells.filter(cell => tCols.filter(n => n == cell.col).length > 1));
+				};
+				if (tBoxs.length != [...new Set(tBoxs)].length) {
+					onState = false;
+					_r.contradiction.push(...tCells.filter(cell => tBoxs.filter(n => n == cell.box).length > 1));
+				};
+	
+				if (fRows.length != [...new Set(fRows)].length) {
+					onState = true;
+					_r.contradiction.push(...fCells.filter(cell => fRows.filter(n => n == cell.row).length > 1));
+				};
+				if (fCols.length != [...new Set(fCols)].length) {
+					onState = true;
+					_r.contradiction.push(...fCells.filter(cell => fCols.filter(n => n == cell.col).length > 1));
+				};
+				if (fBoxs.length != [...new Set(fBoxs)].length) {
+					onState = true;
+					_r.contradiction.push(...fCells.filter(cell => fBoxs.filter(n => n == cell.box).length > 1));
+				};
+
+				if (onState !== null) {
+					_r.cells.forEach(cell => {
+						for (const [key, value] of Object.entries(cell.complexState)) {
+							if (value === null) continue;
+							let candidate = parseInt(key);
+							if (value === onState) _r.changes.push([cell, candidate, [candidate]]);
+							else _r.changes.push([cell, null, cell.candidates.remove(candidate)]);
+						};
+					});
+				};
+				if (_r.changes.length) {
+					_r.rule = 2;
+					return _r;
+				};
+			};
+
+			
+
+
+			function setState(cell, candidate, state) {
+				if (cell.complexState[candidate] || !cell.candidates.includes(candidate)) return;
+
+				cell.simpleState = true;
+				cell.complexState[candidate] = state;
+
+				if (cell.candidates.length == 2) {
+					console.log(`INTER ${cell.id} : ${candidate} <-> ${cell.candidates.find(c => c != candidate)}`);
+					_r.inters.push([cell, candidate, cell.candidates.find(c => c != candidate)]);
+					setState(cell, cell.candidates.find(c => c != candidate), !state);
+				};
+	
+				cell.sees().forEach(link => {
+					if (cell.strong(candidate, link) && !link.complexState[candidate]) {
+						console.log(`STRONG ${cell.id} <-> ${link.id} : ${candidate}`);
+						_r.strongs.push([cell, link, candidate]);
+						setState(link, candidate, !state);
+					} else if (cell.weak(candidate, link) && state) {
+						//console.log(`WEAK ${cell.id}  -> ${link.id} : ${candidate}`);
+						//_r.weaks.push([cell, link, candidate]);
+						//setState(link, candidate, false);
+					};
+				});
 			};
 		};
 
@@ -1569,6 +1751,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		if (this.solution) return;
 
 		// 3D Medusa
+		this.solution = this.medusa();
+		if (this.solution) return;
 
 		// Jellyfish
 		this.solution = this.fish(4);
