@@ -29,6 +29,7 @@ function _Cell(game = new _Game(), id = '', value = 0) {
 	this.value = value;
 	// An important feature is that candidate arrays are always sorted lowest to highest
 	// Therefore cells with identical available candidates will have identical cell.candidates
+	// TODO: Change this from type Array to Set for optimisation purposes
 	this.candidates = value ? [value] : [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 	// ==================
@@ -277,7 +278,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		let cells = [];
 		if (!Array.isArray(candidates)) candidates = [candidates];
 
-		this.forEachCell(cell => {
+		function getCells(cell) {
 			if (cell.value) return;
 			if (row && cell.row != row) return;
 			if (col && cell.col != col) return;
@@ -299,9 +300,15 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 
 			// DEFAULT: cells must contain at least one `[candidates]` ie: [1,2] = [1,8,9]
 			if (candidates.some(c => cell.candidates.includes(c))) cells.push(cell);
-		});
+		};
 
-		return cells;
+
+		if (row) this.forEachCellOfRows(row, getCells);
+		if (col) this.forEachCellOfCols(col, getCells);
+		if (box) this.forEachCellOfBoxs(box, getCells);
+
+
+		return [... new Set(cells)];
 	};
 
 	this.intersection = (eyes = [], excl = false) => {
@@ -820,7 +827,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 				for (const combo of rCombos) {
 					// Get all the cells that make up our prospective fish
 					// `combo` elements are 1-indexed so we must subtract one to find out indexes
-					let fish = combo.map(index => rTuples[index]).flat();
+					let fish = combo.map(index => rTuples[index]).cFlat();
 
 					// Get the unique columns of our fish
 					let cols = [...new Set(fish.map(cell => cell.col))];
@@ -860,7 +867,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 				for (const combo of cCombos) {
 					// Get all the cells that make up our prospective fish
 					// `combo` elements are 1-indexed so we must subtract one to find out indexes
-					let fish = combo.map(index => cTuples[index]).flat();
+					let fish = combo.map(index => cTuples[index]).cFlat();
 
 					// Get the unique rows of our fish
 					let rows = [...new Set(fish.map(cell => cell.row))];
@@ -954,7 +961,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 				setState(pair[1], false);
 
 				// Get all cells that are apart of the chain
-				let chain = pairs.flat().filter(cell => cell.simpleState !== null);
+				let chain = pairs.cFlat().filter(cell => cell.simpleState !== null);
 				// Remove duplicates
 				let uChain = [...new Set(chain)];
 
@@ -1254,6 +1261,8 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	this.xcycle = () => {
 		// Find all strong links (conjugate pairs) between cells and try to form a loop using weak/strong links
 		// TODO: Comment this
+		// TODO: Optimise this, currently takes ~50 seconds on 000908430004702680081054002005003129000520308000090560000079810017005006400106050
+		// 										Optimised from 53 -> 50 -> 38 -> 34
 		// BUG: Finds weak xcycle instead of strong: 804537000023614085605982034000105870500708306080203450200859003050371208008426507
 		// BUG: Simple states don't propogate consistently on rule 3 - this just affects ui highlighting
 
@@ -1289,29 +1298,41 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		};
 
 
+		// Iterate through all candidates looking for viable X-Cycles
 		for (const candidate of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+			// Find all conjugate pairs
 			let pairs = [];
 			for (const house of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+				// Get all cells that contain `candidate` in `house`
 				let rCells = this.containsCandidates(candidate, house);
 				let cCells = this.containsCandidates(candidate, 0, house);
 				let bCells = this.containsCandidates(candidate, 0, 0, house);
-	
+				
+				// If there are only two cells containing `candidate`, those cells are conjugate pairs
 				if (rCells.length == 2) pairs.push(rCells);
 				if (cCells.length == 2) pairs.push(cCells);
 				if (bCells.length == 2) pairs.push(bCells);
 			};
 			
+			// Incrementally increase the number of pairs `r` chosen from the set `pairs`
 			for (let r = 1; r <= pairs.length; r++) {
+				// Iterate each combination of `r` conjugate pairs
 				for (const combo of Math.combinations(pairs.length, r)) {
+					// Get the conjugate pairs (strongly linked cells) for our combo
 					let strongs = combo.map(index => pairs[index]);
+					// We'll attempt to fill the X-Cycle with weak links
 					let weaks = [];
-					let xcycle = strongs.flat();
+					// Get all the cells involved into one variable
+					let xcycle = strongs.cFlat();
 
+					// Reset the _Cell properties we'll be using
 					this.forEachCell(cell => {
 						cell.hasWeak = false;
 						cell.simpleState = null;
 					});
 
+					// Set the _Cell.simpleState of all cells in our xcycle.
+					// setState() is recursive and will affect all relevant cells
 					setState(strongs[0][0], true);
 					setState(strongs[0][1], false);
 					
@@ -1340,15 +1361,12 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 					});
 					let continuous = strongs.every(pair => pair[0].hasWeak && pair[1].hasWeak);
 
-					let _r = new _Xcycle(strongs.flat(), [], candidate, strongs, weaks);
+					let _r = new _Xcycle(strongs.cFlat(), [], candidate, strongs, weaks);
 
 					if (continuous) {
 						// ===============================
 						// NICE LOOP [RULE 1] - CONTINUOUS
 						// ===============================
-
-						_r.rule = 1;
-						
 						this.forEachCell(cell => {
 							// Check if the cell contains `candidate`
 							if (!cell.candidates.includes(candidate)) return;
@@ -1361,32 +1379,40 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		
 							if (tState && fState) _r.changes.push([cell, null, cell.candidates.remove(candidate)]);
 						});
-	
-					} else {
-						let failed = xcycle.filter(cell => !cell.hasWeak);
-						if (failed.every(cell => cell.id == failed[0].id)) {
-							// =========================================
-							// NICE LOOP [RULE 2] - DISCONTINUOUS STRONG
-							// =========================================
-							_r.rule = 2;
-							_r.ruleCell = failed[0];
-							_r.changes.push([_r.ruleCell, candidate, [candidate]]);
-
-						} else if (failed.length == 2) {
-							let intersects = this.intersection(failed, true);
-							intersects.forEach(cell => {
-								if (!cell.candidates.includes(candidate)) return;
-								// =======================================
-								// NICE LOOP [RULE 3] - DISCONTINUOUS WEAK
-								// =======================================
-								_r.rule = 3;
-								_r.changes.push([cell, null, cell.candidates.remove(candidate)]);
-								_r.weaks.push([failed[0], cell], [failed[1], cell]);
-							});
+						
+						if (_r.changes.length) {
+							_r.rule = 1;
+							return _r;
 						};
 					};
+					
+					let failed = xcycle.filter(cell => !cell.hasWeak);
 
-					if (_r.changes.length) return _r;
+					if (failed.every(cell => cell.id == failed[0].id)) {
+						// =========================================
+						// NICE LOOP [RULE 2] - DISCONTINUOUS STRONG
+						// =========================================
+						_r.rule = 2;
+						_r.ruleCell = failed[0];
+						_r.changes.push([_r.ruleCell, candidate, [candidate]]);
+						return _r;
+					};
+					if (failed.length == 2) {
+						let intersects = this.intersection(failed, true);
+						intersects.forEach(cell => {
+							if (!cell.candidates.includes(candidate)) return;
+							// =======================================
+							// NICE LOOP [RULE 3] - DISCONTINUOUS WEAK
+							// =======================================
+							_r.changes.push([cell, null, cell.candidates.remove(candidate)]);
+							_r.weaks.push([failed[0], cell], [failed[1], cell]);
+						});
+
+						if (_r.changes.length) {
+							_r.rule = 3;
+							return _r;
+						};
+					};
 
 
 
@@ -1397,7 +1423,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 							if (link.simpleState !== null) return;
 
 							if (cell.strong(candidate, link)) setState(link, !state);
-							if (cell.weak(candidate, link) && state) setState(link, false);
+							else if (state && cell.sees(link) && link.candidates.includes(candidate)) setState(link, false);
 						});
 					};
 				};
@@ -1411,7 +1437,6 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	this.xychain = () => {
 		// Try to find two bi-value cells containing a candidate and link them with more bi-value cells
 		// TODO: Comment this
-		// TODO: This function needs optimising (badly)
 
 
 		function _Xychain(cells, changes, candidate, chain, start, end) {
@@ -1437,49 +1462,62 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		};
 
 
+		// Get all bi-value cells
+		// We'll use these to look for viable "target" (start & end) cells
 		let bivalues = [];
 		this.forEachCell(cell => {
 			if (cell.candidates.length == 2) bivalues.push(cell);
 		});
 
+		// Iterate through each candidate
 		for (const candidate of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+			// Look for two or more bi-value cells containing `candidate` to test XY-Chains on
 			let targets = bivalues.filter(cell => cell.candidates.includes(candidate));
+			// If we can't find at least two bi-value cells, move on
 			if (targets.length < 2) continue;
 
-			for (const combo of Math.combinations(targets.length, 2)) {
+			// Iterate through each target cell, using it as a start
+			// We don't need to look at the last target cell because no other target cells could chain to it
+			for (const start of targets.slice(0, -1)) {
+				// This constructor function will help us keep track of the XY-Chain's cell ordering
 				function _Link(cell, backward, forward) {
 					this.cell = cell;
 					this.backward = backward || 0;
 					this.forward = forward || 0;
 				};
 
-				let start = targets[combo[0]];
-				let end = targets[combo[1]];
+				// Put all non-`start` target cells in an array
+				let ends = targets.filter(cell => cell.id != start.id && this.intersection([start, cell], true).filter(inter => inter.candidates.includes(candidate)).length);
 				let startL = new _Link(start, candidate, start.candidates.find(c => c != candidate));
-				let endL = new _Link(end, end.candidates.find(c => c != candidate), candidate);
+				let endsL = ends.map(end => new _Link(end, end.candidates.find(c => c != candidate), candidate));
 
-				let intersection = this.intersection([start, end], true).filter(cell => cell.candidates.includes(candidate));
-				if (!intersection.length) continue;
+				// Check if any `start` to `end` chain would instigate changes
+				if (!ends.length) continue;
 
 				let found = false;
 				let chain = [];
 
 				function recurse(curr) {
+					// If we've found a viable XY-Chain, return
 					if (found) return;
+					// Otherwise push our current _Link to the chain
 					chain.push(curr);
 
-					if (curr.cell.sees(end) && curr.forward == endL.backward) {
+					// Check if the current _Link sees any end, and it has the correct candidate to end the cycle
+					let endL = endsL.find(endL => curr.cell.sees(endL.cell) && curr.forward == endL.backward);
+					if (endL) {
 						found = true;
 						chain.push(endL);
 						return;
 					};
-					
+
+					// Find the next possible cells of the chain
 					let next = bivalues.filter(cell => {
 						return (
-							chain.every(link => link.cell.id != cell.id)
-							&& cell.candidates.includes(curr.forward)
+							cell.candidates.includes(curr.forward)
 							&& cell.sees(curr.cell)
-							&& cell.id != end.id
+							&& !ends.cellIds().includes(cell.id)
+							&& chain.every(link => link.cell.id != cell.id)
 						);
 					});
 					next.forEach(cell => recurse(new _Link(cell, curr.forward, cell.candidates.find(c => c != curr.forward))));
@@ -1489,8 +1527,14 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 				recurse(startL);
 
 				if (chain.length) {
+					let end = chain[chain.length - 1].cell;
 					let _r = new _Xychain(chain.map(link => link.cell), [], candidate, chain, start, end);
-					intersection.forEach(cell => _r.changes.push([cell, null, cell.candidates.remove(candidate)]));
+					let intersection = this.intersection([start, end], true);
+					intersection.forEach(cell => {
+						if (!cell.candidates.includes(candidate)) return;
+
+						_r.changes.push([cell, null, cell.candidates.remove(candidate)]);
+					});
 					return _r;
 				};
 			};
@@ -1502,7 +1546,6 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	this.medusa = () => {
 		// Establish chains between bi-value, weak and stronly linked cells
 		// TODO: Comment this
-		// TODO: This function need optimising
 
 		// RULE 1: Two candidates in cell same colour
 		// RULE 2: Two candidates in house same colour
@@ -1793,33 +1836,52 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 			return;
 		};
 
+		let t0, t1;
 
 		// =================
 		// SIMPLE STRATEGIES
 		// =================
 
 		// Hidden/Naked Singles (finds all at once)
+		t0 = performance.now();
 		this.solution = this.singles();
+		t1 = performance.now();
+		console.log(`_Game.Solving.singles(): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Hidden/Naked Pairs
+		t0 = performance.now();
 		this.solution = this.tuple(2);
+		t1 = performance.now();
+		console.log(`_Game.Solving.tuple(2): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Hidden/Naked Triples
+		t0 = performance.now();
 		this.solution = this.tuple(3);
+		t1 = performance.now();
+		console.log(`_Game.Solving.tuple(3): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Hidden/Naked Quads
+		t0 = performance.now();
 		this.solution = this.tuple(4);
+		t1 = performance.now();
+		console.log(`_Game.Solving.tuple(4): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Pointing Pairs/Triples
+		t0 = performance.now();
 		this.solution = this.pointing();
+		t1 = performance.now();
+		console.log(`_Game.Solving.pointing(): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Line Reductions
+		t0 = performance.now();
 		this.solution = this.lineReduction();
+		t1 = performance.now();
+		console.log(`_Game.Solving.lineReduction(): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 
@@ -1828,23 +1890,38 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		// ================
 		
 		// X-Wings
+		t0 = performance.now();
 		this.solution = this.fish(2);
+		t1 = performance.now();
+		console.log(`_Game.Solving.fish(2): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Chains (Simple Colouring)
+		t0 = performance.now();
 		this.solution = this.chain();
+		t1 = performance.now();
+		console.log(`_Game.Solving.chain(): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Y-Wing
+		t0 = performance.now();
 		this.solution = this.ywing();
+		t1 = performance.now();
+		console.log(`_Game.Solving.ywing(): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Swordfish
+		t0 = performance.now();
 		this.solution = this.fish(3);
+		t1 = performance.now();
+		console.log(`_Game.Solving.fish(3): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Z-Wing
+		t0 = performance.now();
 		this.solution = this.zwing();
+		t1 = performance.now();
+		console.log(`_Game.Solving.zwing(): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 
@@ -1853,19 +1930,31 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		// =====================
 
 		// X-Cycles
+		t0 = performance.now();
 		this.solution = this.xcycle();
+		t1 = performance.now();
+		console.log(`_Game.Solving.xcycle(): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// XY-Chains
+		t0 = performance.now();
 		this.solution = this.xychain();
+		t1 = performance.now();
+		console.log(`_Game.Solving.xychain(): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// 3D Medusa
+		t0 = performance.now();
 		this.solution = this.medusa();
+		t1 = performance.now();
+		console.log(`_Game.Solving.medusa(): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Jellyfish
+		t0 = performance.now();
 		this.solution = this.fish(4);
+		t1 = performance.now();
+		console.log(`_Game.Solving.fish(4): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Unique Rectangles
@@ -1894,11 +1983,17 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		// ========
 
 		// Squirmbag
+		t0 = performance.now();
 		this.solution = this.fish(5);
+		t1 = performance.now();
+		console.log(`_Game.Solving.fish(5): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Bi-Value Universal Graveyard (BUG)
+		t0 = performance.now();
 		this.solution = this.bug();
+		t1 = performance.now();
+		console.log(`_Game.Solving.bug(): ${t1 - t0} ms`);
 		if (this.solution) return;
 
 		// Gurth's Theorem
@@ -1968,6 +2063,15 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		return this.map(cell => cell.id);
 	};
 	Object.defineProperty(Array.prototype, "cellIds", {enumerable: false});
+
+
+	// Array.prototype.cFlat
+	// Native Array.flat() is very slow
+	if (Array.prototype.cFlat) console.warn('Overriding existing Array.prototype.cFlat method');
+	Array.prototype.cFlat = function() {
+		return [].concat(...this);
+	};
+	Object.defineProperty(Array.prototype, 'cFlat', {enumerable: false});
 
 
 	// Math.combinations
