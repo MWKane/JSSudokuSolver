@@ -29,7 +29,6 @@ function _Cell(game = new _Game(), id = '', value = 0) {
 	this.value = value;
 	// An important feature is that candidate arrays are always sorted lowest to highest
 	// Therefore cells with identical available candidates will have identical cell.candidates
-	// TODO: Change this from type Array to Set for optimisation purposes
 	this.candidates = value ? [value] : [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 	// ==================
@@ -306,6 +305,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		if (row) this.forEachCellOfRows(row, getCells);
 		if (col) this.forEachCellOfCols(col, getCells);
 		if (box) this.forEachCellOfBoxs(box, getCells);
+		if (!row && !col && !box) this.forEachCell(getCells);
 
 
 		return [... new Set(cells)];
@@ -1261,7 +1261,7 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 	this.xcycle = () => {
 		// Find all strong links (conjugate pairs) between cells and try to form a loop using weak/strong links
 		// TODO: Comment this
-		// TODO: Optimise this, currently takes ~50 seconds on 000908430004702680081054002005003129000520308000090560000079810017005006400106050
+		// TODO: Optimise this, currently takes ~53 seconds on 000908430004702680081054002005003129000520308000090560000079810017005006400106050
 		// 										Optimised from 53 -> 50 -> 38 -> 34
 		// BUG: Finds weak xcycle instead of strong: 804537000023614085605982034000105870500708306080203450200859003050371208008426507
 		// BUG: Simple states don't propogate consistently on rule 3 - this just affects ui highlighting
@@ -1818,6 +1818,128 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		return null;
 	};
 
+	this.unique = () => {
+		// For a puzzle to have a unique soluton, there must be no rectangle patterns of XY <-> XY | XY <-> XY (over 2 boxes)
+		// TODO: comment this
+
+
+		function _Unique(cells, changes, candidates, type, roof, floor) {
+			this.name = 'UNIQUERECTANGLE';
+
+			// [_Cell, ...]
+			this.cells = cells || [];
+
+
+			// [[_Cell(), value, candidates], ...]
+			this.changes = changes || [];
+
+			// [candidate1, candidate2]
+			this.candidates = candidates || [];
+
+			// 1/2/3/4/5
+			this.type = type || 0;
+
+			// [_Cell(), ...]
+			this.roof = roof || [];
+			
+			// [_Cell(), ...]
+			this.floor = floor || [];
+		};
+
+
+		let bivalues = [];
+		this.forEachCell(cell => {
+			if (cell.candidates.length == 2) bivalues.push(cell);
+		});
+
+		let bicandidates = bivalues.map(cell => cell.candidates).filter(function(candidates) {
+			let key = candidates.join('-');
+			return this[key] ? true : !(this[key] = true);
+		}, Object.create(null));
+		let uBicandidates = [...new Set(bicandidates.map(bivalue => JSON.stringify(bivalue)))].map(bivalue => JSON.parse(bivalue));
+
+		for (const candidates of uBicandidates) {
+			let corners = this.containsCandidates(candidates, 0, 0, 0, false, true);
+			
+			for (const combo of Math.combinations(corners.length, 4)) {
+				let cells = combo.map(index => corners[index]);
+
+				let floor = cells.filter(cell => cell.candidates.length == 2);
+				if (floor.length < 2) continue;
+
+				let roof = cells.filter(cell => cell.candidates.length != 2);
+				if (!roof.length) continue;
+
+				let rows = cells.map(cell => cell.row);
+				let cols = cells.map(cell => cell.col);
+				let boxs = cells.map(cell => cell.box);
+				if (new Set(rows).size != 2) continue;
+				if (new Set(cols).size != 2) continue;
+				if (new Set(boxs).size != 2) continue;
+
+				let _r = new _Unique(cells, [], candidates, 0, roof, floor);
+
+				if (roof.length == 1) {
+					// ================================
+					// TYPE ONE: XY <-> XY | XYZ <-> XY
+					// ================================
+
+					let cell = roof[0];
+					_r.type = 1;
+					_r.changes.push([cell, null, cell.candidates.remove(_r.candidates)]);
+					return _r;
+				};
+
+				if (roof.every(cell => cell.candidates.length == 3)) {
+
+					if (roof[0].candidates.equals(roof[1].candidates)) {
+						// =================================
+						// TYPE TWO: XY <-> XY | XYZ <-> XYZ
+						// =================================
+
+						let candidate = roof[0].candidates.find(c => !candidates.includes(c));
+						let intersecting = this.intersection(roof, true).filter(cell => cell.candidates.includes(candidate));
+						intersecting.forEach(cell => _r.changes.push([cell, null, cell.candidates.remove(candidate)]));
+						if (_r.changes.length) {
+							_r.type = 2;
+							return _r;
+						};
+					};
+				};
+
+				// ===================================
+				// TYPE THREE: XY <-> XY | XYA <-> XYB
+				// ===================================
+
+				let [roof1, roof2] = roof;
+
+				let rCandidates = roof.map(cell => cell.candidates.find(c => !candidates.includes(c)));
+				rCandidates = [...new Set(rCandidates.sort((a, b) => a - b))];
+
+				let tuples = [];
+				if (roof1.row == roof2.row) tuples.push(this.containsCandidates(rCandidates, roof1.row));
+				if (roof1.col == roof2.col) tuples.push(this.containsCandidates(rCandidates, 0, roof1.col));
+				if (roof1.box == roof2.box) tuples.push(this.containsCandidates(rCandidates, 0, 0, roof1.box));
+
+				console.log(tuples);
+
+				tuples.forEach(tuple => {
+					if (tuple.length != rCandidates.length) return;
+
+					let intersecting = this.intersection([...roof, ...tuple], true);
+					intersecting.forEach(cell => {
+						if (!cell.candidates.some(c => rCandidates.includes(c))) return;
+						_r.changes.push([cell, null, cell.candidates.remove(rCandidates)]);
+					});
+				});
+
+				if (_r.changes.length) {
+					_r.type = 3;
+					return _r;
+				};
+			};
+		};
+	};
 
 
 	// ==============
@@ -1958,6 +2080,11 @@ function _Game(string = '0000000000000000000000000000000000000000000000000000000
 		if (this.solution) return;
 
 		// Unique Rectangles
+		t0 = performance.now();
+		this.solution = this.unique();
+		t1 = performance.now();
+		console.log(`_Game.Solving.unique(): ${t1 - t0} ms`);
+		if (this.solution) return;
 
 		//Fireworks
 

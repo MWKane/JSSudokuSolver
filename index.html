@@ -367,6 +367,14 @@
 						});
 						s.contradiction.forEach(cell => highlight('yellow', cell));
 					break;
+
+					// UNIQUE RECTANGLE
+					case 'UNIQUERECTANGLE':
+						console.log(`UNIQUE RECTANGLE (${s.candidates}): [${s.cells.cellIds()}] TYPE${s.type}`);
+
+						s.roof.forEach(cell => highlight('orange', cell));
+						s.floor.forEach(cell => highlight('yellow', cell));
+					break;
 				};
 			};
 
